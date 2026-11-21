@@ -1101,13 +1101,13 @@ async def screen_resumes(
                 1
             )
 
-            matched_skills = [
-                m["skill"]
-                for m in (
-                    coverage["exact_matches"] +
-                    coverage["transferable_matches"]
-                )
-            ]
+           matched_skills = [
+    m["required_skill"]
+    for m in (
+        coverage["exact_matches"] +
+        coverage["transferable_matches"]
+    )
+]
 
             missing_skills = coverage["missing_skills"]
 
@@ -1256,7 +1256,7 @@ async def screen_resumes(
             )
 
             matched_skills = [
-                m["skill"]
+                m["required_skill"]
                 for m in (
                     coverage["exact_matches"] +
                     coverage["transferable_matches"]
