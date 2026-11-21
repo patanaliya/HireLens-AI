@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FriendLounge • Say Hi & Exchange Ideas</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Confetti script from reliable CDN with fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/dist/confetti.browser.min.js"></script>
+
+  <style>
+    :root {
+      --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-heading: 'Outfit', system-ui, -apple-system, sans-serif;
+
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-card: rgba(255, 255, 255, 0.9);
+      --bg-card-border: rgba(226, 232, 240, 0.85);
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-light: #e0e7ff;
+      --accent-pink: #ec4899;
+      --accent-amber: #f59e0b;
+      --accent-emerald: #10b981;
+      --border-color: #e2e8f0;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      --badge-bg: #f1f5f9;
+      --input-bg: #ffffff;
+    }
+
+    [data-theme='dark'] {
+      --bg-primary: #0b0f19;
+      --bg-secondary: #131b2e;
+      --bg-card: rgba(19, 27, 46, 0.9);
+      --bg-card-border: rgba(30, 41, 59, 0.85);
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #64748b;
+      --accent: #818cf8;
+      --accent-hover: #6366f1;
+      --accent-light: rgba(99, 102, 241, 0.2);
+      --border-color: #1e293b;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      --badge-bg: #1e293b;
+      --input-bg: #0f172a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.08) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(245, 158, 11, 0.05) 0px, transparent 50%);
+      background-attachment: fixed;
+      transition: background-color 0.25s ease, color 0.25s ease;
+    }
+
+    h1, h2, h3, h4, .brand-font {
+      font-family: var(--font-heading);
+      letter-spacing: -0.02em;
+    }
+
+    button, input, textarea, select { font-family: inherit; }
+
+    .glass-panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 16px;
+    }
+
+    @keyframes waveMotion {
+      0%, 100% { transform: rotate(0deg); }
+      20%, 60% { transform: rotate(14deg); }
+      40% { transform: rotate(-8deg); }
+      80% { transform: rotate(-4deg); }
+    }
+
+    .animate-wave {
+      display: inline-block;
+      transform-origin: 70% 70%;
+      animation: waveMotion 2s infinite ease-in-out;
+    }
+
+    .app-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 20px 60px;
+    }
+
+    /* Navbar */
+    .navbar {
+      position: sticky;
+      top: 16px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+      color: white;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--badge-bg);
+      padding: 4px;
+      border-radius: 12px;
+    }
+
+    .nav-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      font-weight: 600;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .nav-tab-btn.active {
+      background: var(--bg-secondary);
+      color: var(--accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+    }
+
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      background: var(--accent-light);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .profile-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 14px 6px 8px;
+      background: var(--badge-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .profile-pill:hover {
+      background: var(--accent-light);
+      border-color: var(--accent);
+    }
+
+    .profile-avatar {
+      font-size: 1.35rem;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-secondary);
+      border-radius: 50%;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+      padding: 32px 36px;
+      border-radius: 20px;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(236, 72, 153, 0.08));
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .hero-content h1 {
+      font-size: 2.1rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+      max-width: 580px;
+    }
+
+    .hero-quick-stats {
+      display: flex;
+      gap: 16px;
+    }
+
+    .stat-pill {
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      min-width: 95px;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Say Hi Section */
+    .sayhi-grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 24px;
+    }
+
+    .action-card {
+      padding: 24px;
+      height: fit-content;
+    }
+
+    .wave-hero-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      font-size: 1.15rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+      margin-bottom: 12px;
+    }
+
+    .wave-hero-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.45);
+    }
+
+    .textarea-clean {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid var(--border-color);
+      background: var(--input-bg);
+      color: var(--text-primary);
+      border-radius: 12px;
+      resize: vertical;
+      min-height: 85px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+      margin-bottom: 12px;
+    }
+
+    .textarea-clean:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-light);
+    }
+
+    .mood-selector {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .mood-btn {
+      background: var(--badge-bg);
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+    }
+
+    .mood-btn.active, .mood-btn:hover {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .primary-btn {
+      padding: 12px 20px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .primary-btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .greeting-card {
+      padding: 20px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .greeting-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .greeting-avatar {
+      font-size: 2rem;
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: var(--badge-bg);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .greeting-body { flex: 1; }
+
+    .greeting-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    .greeting-author { font-weight: 700; font-size: 1.05rem; }
+
+    .greeting-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: var(--accent-light);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .greeting-time { margin-left: auto; font-size: 0.8rem; color: var(--text-muted); }
+
+    .greeting-message {
+      font-size: 0.98rem;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+
+    .reaction-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: var(--badge-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: var(--text-secondary);
+      margin-right: 6px;
+    }
+
+    .reaction-chip:hover, .reaction-chip.reacted {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+      transform: scale(1.05);
+    }
+
+    /* Idea Board */
+    .spark-banner {
+      background: linear-gradient(135deg, #f59e0b, #ec4899);
+      color: white;
+      padding: 18px 24px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 8px 20px rgba(245, 158, 11, 0.25);
+    }
+
+    .spark-btn {
+      background: white;
+      color: #0f172a;
+      border: none;
+      font-weight: 700;
+      padding: 9px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .spark-btn:hover { transform: scale(1.04); }
+
+    .ideaboard-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .category-filter-btn {
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .category-filter-btn.active, .category-filter-btn:hover {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .ideaboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 20px;
+    }
+
+    .idea-card {
+      padding: 24px;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+
+    .idea-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .idea-category-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+
+    .tag-project { background: #e0e7ff; color: #4338ca; }
+    .tag-hangout { background: #fef3c7; color: #b45309; }
+    .tag-gaming { background: #fae8ff; color: #86198f; }
+    .tag-trip { background: #dcfce7; color: #15803d; }
+    .tag-brainstorm { background: #ffe4e6; color: #be123c; }
+
+    .upvote-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upvote-btn:hover, .upvote-btn.upvoted {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 580px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      padding: 28px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.4rem;
+      padding: 4px;
+    }
+
+    @media (max-width: 868px) {
+      .sayhi-grid { grid-template-columns: 1fr; }
+      .navbar { flex-wrap: wrap; gap: 12px; }
+      .hero-quick-stats { width: 100%; justify-content: space-between; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Navbar -->
+    <nav class="navbar glass-panel">
+      <div class="navbar-brand" onclick="switchTab('sayhi')">
+        <div class="brand-icon">
+          <span class="animate-wave">👋</span>
+        </div>
+        <div>
+          <span class="brand-font" style="font-size: 1.25rem; font-weight: 800;">FriendLounge</span>
+          <span style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: 500; margin-top: -2px;">
+            Say Hi & Exchange Ideas
+          </span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs">
+        <button id="tab-sayhi" class="nav-tab-btn active" onclick="switchTab('sayhi')">
+          <span>💬 Say Hi Lounge</span>
+        </button>
+        <button id="tab-ideas" class="nav-tab-btn" onclick="switchTab('ideas')">
+          <span>💡 Idea Board</span>
+        </button>
+      </div>
+
+      <!-- Actions -->
+      <div class="nav-actions">
+        <button class="icon-btn" onclick="openSparkModal()" title="Brainstorm Spark">🎲</button>
+        <button class="icon-btn" onclick="toggleTheme()" id="theme-btn" title="Toggle Light/Dark Mode">🌙</button>
+
+        <!-- Current User Profile Pill -->
+        <div class="profile-pill" onclick="openProfileModal()" title="Switch or customize profile">
+          <span class="profile-avatar" id="nav-avatar">🚀</span>
+          <div style="text-align: left; line-height: 1.2;">
+            <div style="font-weight: 700; font-size: 0.88rem;" id="nav-name">Alex Rivera</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted);" id="nav-status">Building side projects</div>
+          </div>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">▼</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- SAY HI SECTION -->
+    <div id="section-sayhi">
+      <!-- Hero Banner -->
+      <div class="hero-banner glass-panel">
+        <div class="hero-content">
+          <h1>Say Hi to Your Friends! <span class="animate-wave">👋</span></h1>
+          <p class="hero-subtitle">
+            Welcome to the lounge, <strong id="hero-username">Alex</strong>! Drop a friendly wave, share what's on your mind, or vote on your friends' ideas.
+          </p>
+        </div>
+
+        <div class="hero-quick-stats">
+          <div class="stat-pill">
+            <div class="stat-value" id="stat-friends">4</div>
+            <div class="stat-label">Friends</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-value" id="stat-waves">48</div>
+            <div class="stat-label">Waves Shared</div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-value" id="stat-ideas">3</div>
+            <div class="stat-label">Ideas Shared</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sayhi-grid">
+        <!-- Post Box -->
+        <div class="action-card glass-panel">
+          <h3 style="font-size: 1.2rem; margin-bottom: 14px;">👋 Send a Greeting</h3>
+
+          <button class="wave-hero-btn" onclick="sendQuickWave()">
+            <span style="font-size: 1.4rem;">👋</span>
+            <span>Send a Wave to Friends!</span>
+          </button>
+          <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; margin: -6px 0 16px;">
+            Instant cheer with confetti animation ✨
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--border-color); margin: 14px 0;">
+
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 8px;">
+            Or write a custom message:
+          </label>
+          <textarea id="greeting-input" class="textarea-clean" placeholder="Hey everyone, hope you are having a wonderful week!"></textarea>
+
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;">Choose your vibe:</div>
+          <div class="mood-selector" id="mood-selector">
+            <button class="mood-btn active" onclick="selectMood(this, '👋 Friendly Wave')">👋 Wave</button>
+            <button class="mood-btn" onclick="selectMood(this, '☕ Morning Coffee')">☕ Coffee</button>
+            <button class="mood-btn" onclick="selectMood(this, '💡 Brainstorming')">💡 Inspired</button>
+            <button class="mood-btn" onclick="selectMood(this, '🎉 Celebrating')">🎉 Hyped</button>
+            <button class="mood-btn" onclick="selectMood(this, '🎮 Gaming')">🎮 Gaming</button>
+          </div>
+
+          <button class="primary-btn" style="width: 100%;" onclick="postCustomGreeting()">
+            <span>Post to Greeting Wall</span>
+          </button>
+        </div>
+
+        <!-- Greetings Feed -->
+        <div>
+          <h3 style="font-size: 1.2rem; margin-bottom: 16px;">💬 Lounge Activity & Greetings</h3>
+          <div id="greetings-feed">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IDEA BOARD SECTION -->
+    <div id="section-ideas" style="display: none;">
+      <!-- Spark Banner -->
+      <div class="spark-banner">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 800; margin-bottom: 2px;">🎲 Need an idea spark?</h3>
+          <p style="font-size: 0.88rem; opacity: 0.95;">Spin the random prompt wheel to generate fun ideas for your friends to brainstorm on!</p>
+        </div>
+        <button class="spark-btn" onclick="openSparkModal()">Roll a Prompt 🎲</button>
+      </div>
+
+      <!-- Controls -->
+      <div class="ideaboard-controls">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="category-filter-btn active" onclick="filterCategory(this, 'all')">🌟 All Ideas</button>
+          <button class="category-filter-btn" onclick="filterCategory(this, 'project')">💡 Projects</button>
+          <button class="category-filter-btn" onclick="filterCategory(this, 'hangout')">🍕 Hangouts</button>
+          <button class="category-filter-btn" onclick="filterCategory(this, 'gaming')">🎮 Gaming</button>
+          <button class="category-filter-btn" onclick="filterCategory(this, 'trip')">✈️ Trips</button>
+        </div>
+
+        <button class="primary-btn" onclick="openCreateIdeaModal()">
+          <span>+ Share New Idea</span>
+        </button>
+      </div>
+
+      <!-- Ideas Grid -->
+      <div class="ideaboard-grid" id="ideas-grid">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+    <footer style="margin-top: 60px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+      <p>FriendLounge • A warm place to say hi & exchange ideas with friends ☕✨</p>
+    </footer>
+  </div>
+
+  <!-- MODAL: CREATE IDEA -->
+  <div id="modal-create-idea" class="modal-overlay" onclick="closeModals()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 style="font-size: 1.3rem; font-weight: 800;">💡 Share a New Idea</h2>
+        <button class="modal-close-btn" onclick="closeModals()">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 6px;">Idea Title</label>
+          <input type="text" id="new-idea-title" class="textarea-clean" style="min-height: auto; padding: 12px;" placeholder="e.g. Secret Santa with customized code gifts...">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 6px;">Category</label>
+          <select id="new-idea-category" class="textarea-clean" style="min-height: auto; padding: 10px;">
+            <option value="project">💡 Project / Coding</option>
+            <option value="hangout">🍕 Weekend Hangout</option>
+            <option value="gaming">🎮 Gaming & Fun</option>
+            <option value="trip">✈️ Trip & Chill</option>
+            <option value="brainstorm">🧠 Wild Brainstorm</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 6px;">Details & Explanation</label>
+          <textarea id="new-idea-desc" class="textarea-clean" rows="4" placeholder="What's the plan? Why would it be fun or useful?"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button class="primary-btn" style="background: var(--badge-bg); color: var(--text-primary);" onclick="closeModals()">Cancel</button>
+          <button class="primary-btn" onclick="submitNewIdea()">Publish Idea</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VIEW IDEA DETAILS & COMMENTS -->
+  <div id="modal-view-idea" class="modal-overlay" onclick="closeModals()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span id="view-idea-tag" class="idea-category-tag tag-project">💡 Project</span>
+        <button class="modal-close-btn" onclick="closeModals()">✕</button>
+      </div>
+
+      <h2 id="view-idea-title" style="font-size: 1.35rem; font-weight: 800; margin-bottom: 8px;"></h2>
+      <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;" id="view-idea-meta"></div>
+      <p id="view-idea-desc" style="font-size: 1rem; line-height: 1.6; margin-bottom: 24px; white-space: pre-wrap;"></p>
+
+      <hr style="border: none; border-top: 1px solid var(--border-color); margin: 16px 0;">
+
+      <h4 style="font-size: 1.05rem; margin-bottom: 12px;">💬 Discussion & Feedback (<span id="view-idea-comment-count">0</span>)</h4>
+      <div id="view-idea-comments" style="display: flex; flex-direction: column; gap: 10px; max-height: 220px; overflow-y: auto; margin-bottom: 16px;"></div>
+
+      <div style="display: flex; gap: 8px;">
+        <input type="text" id="new-comment-input" class="textarea-clean" style="min-height: auto; padding: 10px 14px; margin-bottom: 0;" placeholder="Leave a suggestion or reply...">
+        <button class="primary-btn" onclick="submitComment()">Reply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SPARK GENERATOR -->
+  <div id="modal-spark" class="modal-overlay" onclick="closeModals()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2 style="font-size: 1.3rem; font-weight: 800;">🎲 Idea Spark Generator</h2>
+        <button class="modal-close-btn" onclick="closeModals()">✕</button>
+      </div>
+
+      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 16px;">
+        Need instant inspiration? Spin the random wheel!
+      </p>
+
+      <div class="glass-panel" style="padding: 20px; border: 2px dashed var(--accent); margin-bottom: 20px;">
+        <span id="spark-category-tag" class="idea-category-tag tag-hangout">🍕 Hangout</span>
+        <h3 id="spark-title" style="font-size: 1.2rem; font-weight: 800; margin: 10px 0 6px;">Secret Recipe Cook-off</h3>
+        <p id="spark-desc" style="font-size: 0.92rem; color: var(--text-secondary);">Everyone brings one dish cooked with a secret weird ingredient. We rate creativity and flavor!</p>
+      </div>
+
+      <div style="display: flex; justify-content: space-between;">
+        <button class="primary-btn" style="background: var(--badge-bg); color: var(--text-primary);" onclick="rollNextSpark()">🔄 Roll Another</button>
+        <button class="primary-btn" onclick="adoptCurrentSpark()">Post This Idea 💡</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: PROFILE & FRIEND SWITCHER -->
+  <div id="modal-profile" class="modal-overlay" onclick="closeModals()">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 480px;">
+      <div class="modal-header">
+        <h2 style="font-size: 1.3rem; font-weight: 800;">Switch or Edit Friend Profile</h2>
+        <button class="modal-close-btn" onclick="closeModals()">✕</button>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+          Quick Switch Friend:
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="friends-quick-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid var(--border-color); margin: 16px 0;">
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+          Customize Current Profile:
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 4px;">Name</label>
+          <input type="text" id="profile-name-input" class="textarea-clean" style="min-height: auto; padding: 10px;">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 4px;">Avatar Emoji</label>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="avatar-choices">
+            <!-- emojis -->
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.86rem; font-weight: 600; margin-bottom: 4px;">Status / What are you up to?</label>
+          <input type="text" id="profile-status-input" class="textarea-clean" style="min-height: auto; padding: 10px;">
+        </div>
+
+        <button class="primary-btn" onclick="saveProfileChanges()" style="margin-top: 6px;">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initial Data
+    const DEFAULT_FRIENDS = [
+      { id: '1', name: 'Alex Rivera', avatar: '🚀', status: 'Building side projects', mood: 'Creative' },
+      { id: '2', name: 'Sam Chen', avatar: '☕', status: 'Sipping matcha & chilling', mood: 'Relaxed' },
+      { id: '3', name: 'Maya Patel', avatar: '🎨', status: 'Designing new concepts', mood: 'Inspired' },
+      { id: '4', name: 'Liam Taylor', avatar: '🎮', status: 'Gaming weekend plans?', mood: 'Hyped' }
+    ];
+
+    const DEFAULT_GREETINGS = [
+      {
+        id: 'g-1',
+        authorName: 'Sam Chen',
+        authorAvatar: '☕',
+        text: 'Good morning everyone! Hope your week is going great. Anyone up for coffee or a quick sync later today?',
+        moodTag: '☕ Morning Vibes',
+        timestamp: '15 mins ago',
+        reactions: { '❤️': 3, '👋': 5, '✨': 2 }
+      },
+      {
+        id: 'g-2',
+        authorName: 'Maya Patel',
+        authorAvatar: '🎨',
+        text: 'Just finished the prototypes for our hackathon project! Super excited to get everyone’s thoughts!',
+        moodTag: '🎨 Creating',
+        timestamp: '1 hour ago',
+        reactions: { '🔥': 4, '💡': 3, '🚀': 2 }
+      },
+      {
+        id: 'g-3',
+        authorName: 'Liam Taylor',
+        authorAvatar: '🎮',
+        text: 'Hey friends! Dropping by to say hi 👋 Let me know if anyone wants to test out the multiplayer build this evening!',
+        moodTag: '🎮 Gaming',
+        timestamp: '3 hours ago',
+        reactions: { '👋': 6, '🎉': 2 }
+      }
+    ];
+
+    const DEFAULT_IDEAS = [
+      {
+        id: 'idea-1',
+        title: 'Weekend Cabin Retreat & Hackathon',
+        category: 'trip',
+        categoryLabel: '✈️ Trip & Chill',
+        description: 'What if we rent an Airbnb cabin near the lake for 3 days next month? We can barbecue, hike in the mornings, and do a fun 24-hour casual game jam together!',
+        authorName: 'Alex Rivera',
+        authorAvatar: '🚀',
+        timestamp: 'Today at 10:15 AM',
+        upvotes: 8,
+        comments: [
+          { authorName: 'Sam Chen', authorAvatar: '☕', text: 'I am 100% in! I can bring the portable grill and board games.', timestamp: '2 hours ago' },
+          { authorName: 'Maya Patel', authorAvatar: '🎨', text: 'Count me in! I will prepare assets and design UI in advance.', timestamp: '1 hour ago' }
+        ]
+      },
+      {
+        id: 'idea-2',
+        title: 'Collaborative Music Playlist & Listening Room',
+        category: 'project',
+        categoryLabel: '💡 Project',
+        description: 'A shared web room where friends can drop their favorite lo-fi / indie tracks and synchronize listening sessions while working or studying together.',
+        authorName: 'Maya Patel',
+        authorAvatar: '🎨',
+        timestamp: 'Yesterday',
+        upvotes: 12,
+        comments: [
+          { authorName: 'Liam Taylor', authorAvatar: '🎮', text: 'We could plug in the Spotify Web Playback SDK for this!', timestamp: 'Yesterday' }
+        ]
+      },
+      {
+        id: 'idea-3',
+        title: 'Bi-Weekly Secret Board Game Tournament',
+        category: 'gaming',
+        categoryLabel: '🎮 Gaming',
+        description: 'Every two weeks, one person picks a secret surprise party game (Catan, Jackbox, Codenames, Smash) and hosts the snacks. Rotating champion trophy included!',
+        authorName: 'Liam Taylor',
+        authorAvatar: '🎮',
+        timestamp: '2 days ago',
+        upvotes: 15,
+        comments: []
+      }
+    ];
+
+    const SPARKS = [
+      { title: 'Secret Recipe Cook-off & Tasting', category: 'hangout', label: '🍕 Weekend Hangout', description: 'Everyone brings one dish cooked with a secret weird ingredient. We do a blind taste test and rate presentation and flavor!' },
+      { title: 'Collaborative AI Comic Book', category: 'project', label: '💡 Project', description: 'Each friend writes one sentence of a storyline, and an AI generator illustrates each panel into a funny shared graphic novel.' },
+      { title: 'Sunset Rooftop Cinema Night', category: 'hangout', label: '🍕 Weekend Hangout', description: 'Set up a portable projector on someone’s terrace with cozy blankets, popcorn seasoning bar, and 90s nostalgia films.' },
+      { title: '48-Hour No-Code App Sprint', category: 'project', label: '💡 Project', description: 'Team up in pairs to build and launch silly micro-apps or Discord bots over a weekend, then present them live on Sunday.' },
+      { title: 'Mystery Destination Road Trip', category: 'trip', label: '✈️ Trip & Chill', description: 'One person gets the budget and plans a weekend getaway, keeping the exact location secret from everyone until the first gas stop!' }
+    ];
+
+    // State
+    let currentUser = JSON.parse(localStorage.getItem('fl_user')) || DEFAULT_FRIENDS[0];
+    let friends = JSON.parse(localStorage.getItem('fl_friends')) || DEFAULT_FRIENDS;
+    let greetings = JSON.parse(localStorage.getItem('fl_greetings')) || DEFAULT_GREETINGS;
+    let ideas = JSON.parse(localStorage.getItem('fl_ideas')) || DEFAULT_IDEAS;
+    let waveCount = parseInt(localStorage.getItem('fl_waves') || '48', 10);
+    let activeMood = '👋 Friendly Wave';
+    let currentCategoryFilter = 'all';
+    let currentSparkIndex = 0;
+    let activeViewingIdeaId = null;
+
+    function saveState() {
+      localStorage.setItem('fl_user', JSON.stringify(currentUser));
+      localStorage.setItem('fl_friends', JSON.stringify(friends));
+      localStorage.setItem('fl_greetings', JSON.stringify(greetings));
+      localStorage.setItem('fl_ideas', JSON.stringify(ideas));
+      localStorage.setItem('fl_waves', waveCount.toString());
+      updateUI();
+    }
+
+    function fireConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+      }
+    }
+
+    function switchTab(tab) {
+      document.getElementById('section-sayhi').style.display = tab === 'sayhi' ? 'block' : 'none';
+      document.getElementById('section-ideas').style.display = tab === 'ideas' ? 'block' : 'none';
+      document.getElementById('tab-sayhi').className = 'nav-tab-btn ' + (tab === 'sayhi' ? 'active' : '');
+      document.getElementById('tab-ideas').className = 'nav-tab-btn ' + (tab === 'ideas' ? 'active' : '');
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('theme-btn').innerText = next === 'light' ? '🌙' : '☀️';
+      localStorage.setItem('fl_theme', next);
+    }
+
+    function sendQuickWave() {
+      waveCount++;
+      fireConfetti();
+      const waveTexts = [
+        "waved hi to everyone! 👋 Hope you're having an awesome day!",
+        "is sending positive energy to all friends today! ✨",
+        "dropped by the lounge to say hello! 🎉"
+      ];
+      const randomText = waveTexts[Math.floor(Math.random() * waveTexts.length)];
+      greetings.unshift({
+        id: 'g-' + Date.now(),
+        authorName: currentUser.name,
+        authorAvatar: currentUser.avatar,
+        text: randomText,
+        moodTag: activeMood,
+        timestamp: 'Just now',
+        reactions: { '👋': 1, '❤️': 1 }
+      });
+      saveState();
+    }
+
+    function selectMood(btn, mood) {
+      activeMood = mood;
+      document.querySelectorAll('#mood-selector .mood-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function postCustomGreeting() {
+      const input = document.getElementById('greeting-input');
+      const text = input.value.trim();
+      if (!text) return;
+      fireConfetti();
+      waveCount++;
+      greetings.unshift({
+        id: 'g-' + Date.now(),
+        authorName: currentUser.name,
+        authorAvatar: currentUser.avatar,
+        text: text,
+        moodTag: activeMood,
+        timestamp: 'Just now',
+        reactions: { '👋': 1 }
+      });
+      input.value = '';
+      saveState();
+    }
+
+    function reactGreeting(id, emoji) {
+      const g = greetings.find(item => item.id === id);
+      if (g) {
+        if (!g.reactions) g.reactions = {};
+        g.reactions[emoji] = (g.reactions[emoji] || 0) + 1;
+        saveState();
+      }
+    }
+
+    function filterCategory(btn, cat) {
+      currentCategoryFilter = cat;
+      document.querySelectorAll('.category-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderIdeas();
+    }
+
+    function upvoteIdea(id, e) {
+      if (e) e.stopPropagation();
+      const idea = ideas.find(i => i.id === id);
+      if (idea) {
+        idea.upvotes = (idea.upvotes || 0) + 1;
+        fireConfetti();
+        saveState();
+      }
+    }
+
+    function openCreateIdeaModal() {
+      document.getElementById('modal-create-idea').classList.add('open');
+    }
+
+    function submitNewIdea() {
+      const title = document.getElementById('new-idea-title').value.trim();
+      const desc = document.getElementById('new-idea-desc').value.trim();
+      const cat = document.getElementById('new-idea-category').value;
+      if (!title || !desc) return alert('Please enter both title and description!');
+
+      const labels = {
+        project: '💡 Project',
+        hangout: '🍕 Weekend Hangout',
+        gaming: '🎮 Gaming & Fun',
+        trip: '✈️ Trip & Chill',
+        brainstorm: '🧠 Wild Brainstorm'
+      };
+
+      ideas.unshift({
+        id: 'idea-' + Date.now(),
+        title: title,
+        category: cat,
+        categoryLabel: labels[cat] || '💡 Idea',
+        description: desc,
+        authorName: currentUser.name,
+        authorAvatar: currentUser.avatar,
+        timestamp: 'Just now',
+        upvotes: 1,
+        comments: []
+      });
+
+      document.getElementById('new-idea-title').value = '';
+      document.getElementById('new-idea-desc').value = '';
+      closeModals();
+      fireConfetti();
+      saveState();
+    }
+
+    function viewIdeaDetails(id) {
+      activeViewingIdeaId = id;
+      const idea = ideas.find(i => i.id === id);
+      if (!idea) return;
+
+      document.getElementById('view-idea-tag').className = 'idea-category-tag tag-' + (idea.category || 'project');
+      document.getElementById('view-idea-tag').innerText = idea.categoryLabel || '💡 Idea';
+      document.getElementById('view-idea-title').innerText = idea.title;
+      document.getElementById('view-idea-meta').innerText = `${idea.authorAvatar} ${idea.authorName} • ${idea.timestamp}`;
+      document.getElementById('view-idea-desc').innerText = idea.description;
+
+      renderIdeaComments(idea);
+      document.getElementById('modal-view-idea').classList.add('open');
+    }
+
+    function renderIdeaComments(idea) {
+      const container = document.getElementById('view-idea-comments');
+      const countSpan = document.getElementById('view-idea-comment-count');
+      const comments = idea.comments || [];
+      countSpan.innerText = comments.length;
+
+      if (comments.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:8px 0;">No comments yet. Share your thoughts!</div>';
+        return;
+      }
+
+      container.innerHTML = comments.map(c => `
+        <div style="background:var(--badge-bg); padding:10px 14px; border-radius:12px; border:1px solid var(--border-color);">
+          <div style="display:flex; align-items:center; gap:6px; font-size:0.82rem; margin-bottom:4px;">
+            <span>${c.authorAvatar || '👤'}</span>
+            <strong>${c.authorName}</strong>
+            <span style="margin-left:auto; color:var(--text-muted); font-size:0.75rem;">${c.timestamp || 'Just now'}</span>
+          </div>
+          <div style="font-size:0.9rem;">${c.text}</div>
+        </div>
+      `).join('');
+    }
+
+    function submitComment() {
+      const input = document.getElementById('new-comment-input');
+      const text = input.value.trim();
+      if (!text || !activeViewingIdeaId) return;
+
+      const idea = ideas.find(i => i.id === activeViewingIdeaId);
+      if (idea) {
+        if (!idea.comments) idea.comments = [];
+        idea.comments.push({
+          authorName: currentUser.name,
+          authorAvatar: currentUser.avatar,
+          text: text,
+          timestamp: 'Just now'
+        });
+        input.value = '';
+        renderIdeaComments(idea);
+        saveState();
+      }
+    }
+
+    // Spark modal
+    function openSparkModal() {
+      currentSparkIndex = Math.floor(Math.random() * SPARKS.length);
+      renderSpark();
+      document.getElementById('modal-spark').classList.add('open');
+    }
+
+    function renderSpark() {
+      const spark = SPARKS[currentSparkIndex];
+      document.getElementById('spark-category-tag').className = 'idea-category-tag tag-' + spark.category;
+      document.getElementById('spark-category-tag').innerText = spark.label;
+      document.getElementById('spark-title').innerText = spark.title;
+      document.getElementById('spark-desc').innerText = spark.description;
+    }
+
+    function rollNextSpark() {
+      currentSparkIndex = (currentSparkIndex + 1) % SPARKS.length;
+      renderSpark();
+    }
+
+    function adoptCurrentSpark() {
+      const spark = SPARKS[currentSparkIndex];
+      ideas.unshift({
+        id: 'idea-' + Date.now(),
+        title: spark.title,
+        category: spark.category,
+        categoryLabel: spark.label,
+        description: spark.description,
+        authorName: currentUser.name,
+        authorAvatar: currentUser.avatar,
+        timestamp: 'Just now',
+        upvotes: 1,
+        comments: []
+      });
+      closeModals();
+      fireConfetti();
+      saveState();
+      switchTab('ideas');
+    }
+
+    // Profile modal
+    function openProfileModal() {
+      document.getElementById('profile-name-input').value = currentUser.name;
+      document.getElementById('profile-status-input').value = currentUser.status || '';
+
+      const emojis = ['🚀', '☕', '🎨', '🎮', '🥑', '🎧', '🐱', '🦊', '⚡', '🌟', '🍕', '👾'];
+      const emojiContainer = document.getElementById('avatar-choices');
+      emojiContainer.innerHTML = emojis.map(em => `
+        <button type="button" class="icon-btn" style="${em === currentUser.avatar ? 'border-color:var(--accent); background:var(--accent-light);' : ''}" onclick="selectAvatarEmoji('${em}', this)">${em}</button>
+      `).join('');
+
+      // quick switch list
+      const quickContainer = document.getElementById('friends-quick-list');
+      quickContainer.innerHTML = friends.map(f => `
+        <button class="primary-btn" style="background:var(--badge-bg); color:var(--text-primary); border:1px solid var(--border-color); justify-content:flex-start; padding:8px 12px;" onclick="switchToFriend('${f.id}')">
+          <span style="font-size:1.2rem;">${f.avatar}</span>
+          <span style="font-size:0.85rem; font-weight:600;">${f.name}</span>
+        </button>
+      `).join('');
+
+      document.getElementById('modal-profile').classList.add('open');
+    }
+
+    let selectedAvatar = currentUser.avatar;
+    function selectAvatarEmoji(em, btn) {
+      selectedAvatar = em;
+      document.querySelectorAll('#avatar-choices .icon-btn').forEach(b => {
+        b.style.borderColor = 'var(--border-color)';
+        b.style.background = 'var(--bg-secondary)';
+      });
+      btn.style.borderColor = 'var(--accent)';
+      btn.style.background = 'var(--accent-light)';
+    }
+
+    function switchToFriend(id) {
+      const f = friends.find(item => item.id === id);
+      if (f) {
+        currentUser = f;
+        closeModals();
+        saveState();
+      }
+    }
+
+    function saveProfileChanges() {
+      const name = document.getElementById('profile-name-input').value.trim();
+      const status = document.getElementById('profile-status-input').value.trim();
+      if (!name) return;
+
+      currentUser.name = name;
+      currentUser.status = status || 'Hanging out';
+      currentUser.avatar = selectedAvatar;
+
+      friends = friends.map(f => f.id === currentUser.id ? currentUser : f);
+      closeModals();
+      saveState();
+    }
+
+    function closeModals() {
+      document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+    }
+
+    function renderGreetings() {
+      const feed = document.getElementById('greetings-feed');
+      feed.innerHTML = greetings.map(g => {
+        const reactions = g.reactions || {};
+        return `
+          <div class="greeting-card glass-panel">
+            <div class="greeting-avatar">${g.authorAvatar || '👤'}</div>
+            <div class="greeting-body">
+              <div class="greeting-top">
+                <span class="greeting-author">${g.authorName}</span>
+                ${g.moodTag ? `<span class="greeting-badge">${g.moodTag}</span>` : ''}
+                <span class="greeting-time">${g.timestamp || 'Recent'}</span>
+              </div>
+              <div class="greeting-message">${g.text}</div>
+              <div style="display:flex; gap:6px;">
+                ${['👋', '❤️', '🔥', '✨'].map(emoji => `
+                  <button class="reaction-chip" onclick="reactGreeting('${g.id}', '${emoji}')">
+                    <span>${emoji}</span>
+                    <span>${reactions[emoji] || 0}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderIdeas() {
+      const grid = document.getElementById('ideas-grid');
+      const filtered = ideas.filter(i => currentCategoryFilter === 'all' || i.category === currentCategoryFilter);
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-muted);">No ideas in this category yet. Click "+ Share New Idea" to post one!</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(idea => `
+        <div class="idea-card glass-panel" onclick="viewIdeaDetails('${idea.id}')">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <span class="idea-category-tag tag-${idea.category || 'project'}">${idea.categoryLabel || '💡 Idea'}</span>
+              <button class="upvote-btn" onclick="upvoteIdea('${idea.id}', event)">
+                <span>👍</span>
+                <span>${idea.upvotes || 0}</span>
+              </button>
+            </div>
+            <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:8px;">${idea.title}</h3>
+            <p style="font-size:0.9rem; color:var(--text-secondary); line-height:1.5; margin-bottom:16px;">${idea.description}</p>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; border-top:1px solid var(--border-color); font-size:0.82rem; color:var(--text-muted);">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>${idea.authorAvatar || '👤'}</span>
+              <span style="font-weight:600; color:var(--text-primary);">${idea.authorName}</span>
+            </div>
+            <div>
+              💬 ${(idea.comments || []).length} thoughts
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateUI() {
+      document.getElementById('nav-avatar').innerText = currentUser.avatar;
+      document.getElementById('nav-name').innerText = currentUser.name;
+      document.getElementById('nav-status').innerText = currentUser.status || '';
+      document.getElementById('hero-username').innerText = currentUser.name.split(' ')[0];
+
+      document.getElementById('stat-friends').innerText = friends.length;
+      document.getElementById('stat-waves').innerText = waveCount;
+      document.getElementById('stat-ideas').innerText = ideas.length;
+
+      renderGreetings();
+      renderIdeas();
+    }
+
+    // Init theme
+    const savedTheme = localStorage.getItem('fl_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.getElementById('theme-btn').innerText = savedTheme === 'light' ? '🌙' : '☀️';
+
+    // Initial render
+    updateUI();
+  </script>
+</body>
+</html>

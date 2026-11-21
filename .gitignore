@@ -1,0 +1,36 @@
+# Virtual Environments & Python
+venv/
+backend/venv/
+__pycache__/
+backend/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+
+# Node Dependencies & Builds
+node_modules/
+frontend/node_modules/
+friends-lounge/node_modules/
+frontend/dist/
+friends-lounge/dist/
+.vite/
+frontend/.vite/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backend/hirelens.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,28 @@
+Alex Chen
+Senior Full-Stack Engineer
+Email: alex.chen@example.com | Phone: +1 415-555-0192 | San Francisco, CA
+LinkedIn: linkedin.com/in/alexchen-dev
+
+SUMMARY
+Results-oriented Full-Stack Engineer with 5+ years of experience designing and scaling microservices, distributed architectures, and modern web applications. Proficient in Python, FastAPI, React, PostgreSQL, Docker, and Redis.
+
+TECHNICAL SKILLS
+- Languages & Frameworks: Python, FastAPI, JavaScript, TypeScript, React, Next.js, Flask
+- Databases & Caching: PostgreSQL, Redis, MongoDB
+- DevOps & Cloud: Docker, Kubernetes, CI/CD, AWS (ECS, S3), Git
+- Architecture: Microservices, REST APIs, System Design, Agile / Scrum
+
+EXPERIENCE
+Senior Software Engineer | CloudScale Systems (2021 - Present)
+- Designed and built high-performance asynchronous REST APIs using FastAPI and PostgreSQL handling 12M+ requests daily.
+- Containerized core services with Docker and orchestrated automated deployments with GitHub Actions CI/CD pipelines.
+- Developed reactive client web applications with React and Next.js, reducing page load times by 35%.
+- Integrated Redis caching layer, decreasing database query latency from 140ms to 18ms.
+
+Software Engineer | NextGen Apps (2019 - 2021)
+- Built scalable full-stack web applications using Python, Django, and React.
+- Maintained PostgreSQL schemas and wrote optimized complex SQL aggregations.
+- Collaborated in a cross-functional Scrum team delivering bi-weekly feature sprints.
+
+EDUCATION
+Bachelor of Science in Computer Science | University of California, Berkeley (2015 - 2019)

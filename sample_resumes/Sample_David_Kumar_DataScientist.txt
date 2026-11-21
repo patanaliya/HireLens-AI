@@ -1,0 +1,25 @@
+David Kumar
+Machine Learning & Data Engineer
+Email: david.kumar@example.com | Phone: +1 617-555-0177 | Boston, MA
+
+SUMMARY
+Data and Machine Learning Engineer with 3.5 years of experience building scalable ML pipelines, PyTorch models, NLP solutions, and data analytics architectures.
+
+TECHNICAL SKILLS
+- Machine Learning & AI: Python, PyTorch, TensorFlow, NLP, Scikit-learn
+- Data Engineering & Databases: SQL, PostgreSQL, Pandas, NumPy, Redis
+- Backend & Cloud: FastAPI, Docker, Git, AWS
+
+EXPERIENCE
+Machine Learning Engineer | Apex Data Labs (2022 - Present)
+- Developed and deployed deep learning and NLP models using PyTorch and FastAPI.
+- Built automated data processing pipelines with Python and PostgreSQL processing 500GB daily data.
+- Containerized ML inference services with Docker for high-reliability staging.
+
+Junior Data Analyst | Insight Analytics (2020 - 2022)
+- Extracted and visualized predictive behavioral models using SQL and Python.
+- Designed analytical dashboards for executive leadership.
+
+EDUCATION
+Master of Science in Data Science | Boston University (2020)
+B.Tech in Computer Science | National Institute of Technology (2018)

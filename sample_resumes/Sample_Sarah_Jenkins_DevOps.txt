@@ -1,0 +1,27 @@
+Sarah Jenkins
+DevOps & Cloud Infrastructure Engineer
+Email: sarah.jenkins@example.com | Phone: +1 206-555-0144 | Seattle, WA
+
+SUMMARY
+Infrastructure and DevOps Specialist with 4.5 years of experience in cloud architecture, container orchestration, Kubernetes, CI/CD pipelines, and automated monitoring.
+
+TECHNICAL SKILLS
+- Cloud & Platforms: AWS (EKS, EC2, CloudFormation), GCP, Linux
+- Containers & Orchestration: Docker, Kubernetes, Helm
+- CI/CD & Automation: GitHub Actions, Jenkins, Terraform, Git
+- Scripting & Backend: Python, Go, Bash, REST APIs
+- Databases: PostgreSQL, MySQL
+
+EXPERIENCE
+Lead DevOps Engineer | Velocity Cloud (2021 - Present)
+- Architected enterprise Kubernetes clusters on AWS EKS serving 50+ internal development teams.
+- Implemented automated infrastructure as code with Terraform and Docker.
+- Built end-to-end CI/CD delivery pipelines reducing deployment rollback rates to under 0.5%.
+- Maintained PostgreSQL database clusters with automated snapshot failover.
+
+Systems Engineer | TechSphere Solutions (2019 - 2021)
+- Automated deployment scripts in Python and Bash for distributed Linux servers.
+- Managed containerized Docker workloads and monitored uptime with Prometheus.
+
+EDUCATION
+B.S. in Computer Information Systems | University of Washington (2015 - 2019)
