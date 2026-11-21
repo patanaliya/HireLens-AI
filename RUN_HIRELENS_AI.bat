@@ -8,7 +8,7 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/2] Starting Backend FastAPI Server on http://127.0.0.1:8000...
+echo [1/2] Starting Backend FastAPI Server on https://hirelens-backend-ea18.onrender.com...
 start "HireLens AI Backend" cmd /k "cd backend && .\venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
 
 timeout /t 3 /nobreak >nul
