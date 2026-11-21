@@ -1,12 +1,15 @@
+
 """
 HireLens AI - Document Parser & PII Anonymizer
+
 Extracts clean text and structural sections from PDF, DOCX, and TXT resumes.
-Supports F7 Blind Screening Mode by stripping PII (names, contact details, links).
+Supports blind screening by masking personal information.
 """
 
 import re
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List
+
 import fitz  # PyMuPDF
 from docx import Document
 
@@ -14,39 +17,77 @@ from docx import Document
 class ResumeParser:
     """Extracts text, structural sections, and sentences from resumes."""
 
-    # Section header heuristics
     SECTION_PATTERNS = {
-        "experience": re.compile(r"^(work\s+experience|professional\s+experience|experience|employment\s+history|work\s+history)", re.IGNORECASE),
-        "projects": re.compile(r"^(projects|personal\s+projects|academic\s+projects|technical\s+projects)", re.IGNORECASE),
-        "skills": re.compile(r"^(skills|technical\s+skills|core\s+competencies|technologies|tools\s+&\s+technologies)", re.IGNORECASE),
-        "education": re.compile(r"^(education|academic\s+background|qualifications)", re.IGNORECASE),
-        "certifications": re.compile(r"^(certifications|licenses|courses|awards)", re.IGNORECASE),
-        "summary": re.compile(r"^(summary|professional\s+summary|profile|about\s+me)", re.IGNORECASE)
+        "experience": re.compile(
+            r"^(work\s+experience|professional\s+experience|"
+            r"experience|employment\s+history|work\s+history|"
+            r"internship\s*/\s*experience)$",
+            re.IGNORECASE
+        ),
+        "projects": re.compile(
+            r"^(projects|personal\s+projects|academic\s+projects|"
+            r"technical\s+projects)$",
+            re.IGNORECASE
+        ),
+        "skills": re.compile(
+            r"^(skills|technical\s+skills|core\s+competencies|"
+            r"technologies|tools\s*&\s*technologies)$",
+            re.IGNORECASE
+        ),
+        "education": re.compile(
+            r"^(education|academic\s+background|qualifications)$",
+            re.IGNORECASE
+        ),
+        "certifications": re.compile(
+            r"^(certifications|licenses|courses|awards)$",
+            re.IGNORECASE
+        ),
+        "summary": re.compile(
+            r"^(summary|professional\s+summary|profile|about\s+me)$",
+            re.IGNORECASE
+        )
     }
 
     @staticmethod
     def extract_text(file_path: Path) -> str:
-        """Extracts text content depending on file type."""
+        """Extract text from PDF, DOCX, or TXT files."""
+
         ext = file_path.suffix.lower()
+
         if ext == ".pdf":
             text = ""
+
             with fitz.open(file_path) as pdf:
                 for page in pdf:
                     text += page.get_text() + "\n"
+
             return text.strip()
+
         elif ext == ".docx":
             doc = Document(file_path)
-            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            return "\n".join(
+                p.text for p in doc.paragraphs if p.text.strip()
+            )
+
         elif ext == ".txt":
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(
+                file_path, "r", encoding="utf-8", errors="ignore"
+            ) as f:
                 return f.read().strip()
+
         else:
             raise ValueError(f"Unsupported file format: {ext}")
 
     @classmethod
     def segment_sections(cls, raw_text: str) -> Dict[str, str]:
-        """Segments raw resume text into logical sections."""
-        lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+        """Divide resume text into logical sections."""
+
+        lines = [
+            line.strip()
+            for line in raw_text.splitlines()
+            if line.strip()
+        ]
+
         sections: Dict[str, List[str]] = {
             "summary": [],
             "experience": [],
@@ -60,13 +101,20 @@ class ResumeParser:
         current_section = "other"
 
         for line in lines:
-            # Check if line matches a known section header
-            matched_section = None
-            clean_line = re.sub(r"[:\-_#*]", "", line).strip()
 
-            if len(clean_line.split()) <= 4:
+            matched_section = None
+
+            clean_line = re.sub(
+                r"[:#*_]",
+                "",
+                line
+            ).strip()
+
+            clean_line = re.sub(r"[-]+$", "", clean_line).strip()
+
+            if len(clean_line.split()) <= 5:
                 for sec_name, pattern in cls.SECTION_PATTERNS.items():
-                    if pattern.match(clean_line):
+                    if pattern.fullmatch(clean_line):
                         matched_section = sec_name
                         break
 
@@ -75,38 +123,83 @@ class ResumeParser:
             else:
                 sections[current_section].append(line)
 
-        return {k: "\n".join(v) for k, v in sections.items() if v}
+        return {
+            key: "\n".join(value)
+            for key, value in sections.items()
+            if value
+        }
 
     @staticmethod
     def extract_sentences(raw_text: str) -> List[str]:
-        """Splits resume text into clean sentences for evidence linking."""
-        # Clean bullets and extra whitespaces
-        cleaned = re.sub(r"[\u2022\u25cf\u25aa\u25b6\-\*]\s*", "", raw_text)
-        sentences = re.split(r"(?<=[.!?])\s+|\n+", cleaned)
-        return [s.strip() for s in sentences if len(s.strip()) > 15]
+        """Split resume text into sentences for evidence linking."""
+
+        cleaned = re.sub(
+            r"[\u2022\u25cf\u25aa\u25b6]",
+            "",
+            raw_text
+        )
+
+        cleaned = re.sub(r"(?m)^\s*[-*]\s*", "", cleaned)
+
+        sentences = re.split(
+            r"(?<=[.!?])\s+|\n+",
+            cleaned
+        )
+
+        return [
+            sentence.strip()
+            for sentence in sentences
+            if len(sentence.strip()) > 15
+        ]
 
     @staticmethod
-    def anonymize_text(raw_text: str, candidate_name: str = "") -> str:
+    def anonymize_text(
+        raw_text: str,
+        candidate_name: str = ""
+    ) -> str:
         """
-        F7: Blind Screening Anonymizer.
-        Strips emails, phone numbers, URLs, and candidate names to prevent unconscious bias.
+        Blind Screening:
+        Masks email addresses, phone numbers, profile URLs,
+        and candidate names.
         """
+
         anonymized = raw_text
 
-        # 1. Mask Emails first (to prevent bracket insertion from corrupting email pattern)
-        anonymized = re.sub(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", "[EMAIL_MASKED]", anonymized)
+        # 1. Mask email addresses
+        anonymized = re.sub(
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+            "[EMAIL_MASKED]",
+            anonymized
+        )
 
-        # 2. Mask Phone Numbers
-        anonymized = re.sub(r"(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", "[PHONE_MASKED]", anonymized)
+        # 2. Mask phone numbers
+        anonymized = re.sub(
+            r"(?<!\w)(?:\+?\d{1,3}[-.\s]?)?"
+            r"(?:\(?\d{3,5}\)?[-.\s]?)"
+            r"\d{3,5}[-.\s]?\d{3,5}(?!\w)",
+            "[PHONE_MASKED]",
+            anonymized
+        )
 
-        # 3. Mask LinkedIn & GitHub URLs
-        anonymized = re.sub(r"(https?://)?(www\.)?(linkedin\.com/in|github\.com)/[a-zA-Z0-9_-]+", "[PROFILE_MASKED]", anonymized, flags=re.IGNORECASE)
+        # 3. Mask LinkedIn and GitHub URLs
+        anonymized = re.sub(
+            r"(?:https?://)?(?:www\.)?"
+            r"(?:linkedin\.com/in|github\.com)/"
+            r"[A-Za-z0-9_-]+/?",
+            "[PROFILE_MASKED]",
+            anonymized,
+            flags=re.IGNORECASE
+        )
 
-        # 4. Mask Candidate Name if provided
+        # 4. Mask candidate name
         if candidate_name and len(candidate_name.strip()) > 2:
-            parts = candidate_name.strip().split()
-            for part in parts:
-                if len(part) > 2:
-                    anonymized = re.sub(rf"\b{re.escape(part)}\b", "[CANDIDATE]", anonymized, flags=re.IGNORECASE)
+            name_pattern = re.escape(candidate_name.strip())
+
+            anonymized = re.sub(
+                rf"\b{name_pattern}\b",
+                "[CANDIDATE]",
+                anonymized,
+                flags=re.IGNORECASE
+            )
 
         return anonymized

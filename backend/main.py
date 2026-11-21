@@ -2,13 +2,13 @@
 import uuid
 import json
 import fitz
-
-from pathlib import Path
-from docx import Document
-
 import io
 import re
 
+from pathlib import Path
+from docx import Document
+from typing import List, Dict, Any, Optional
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi import (
     FastAPI,
     Depends,
@@ -17,23 +17,32 @@ from fastapi import (
     File,
     Form
 )
-
 from fastapi.middleware.cors import CORSMiddleware
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from pydantic import BaseModel
+
 from database import engine, get_db, Base
 from models import (
-    User, Job, CandidateProfile, Resume, Match, GapReport, AuditLog, RecruiterDecision
+    User,
+    Job,
+    CandidateProfile,
+    Resume,
+    Match,
+    GapReport,
+    AuditLog,
+    RecruiterDecision
 )
+
 from schemas import UserRegister, UserLogin
+
 from screening_engine import screening_engine, ScreeningResult
 from skill_graph import skill_graph
 from skill_extractor import skill_extractor
 from parser import ResumeParser
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
 
 from security import (
     hash_password,
@@ -58,7 +67,43 @@ app = FastAPI(
     description="AI-Powered Resume Screening System",
     version="1.0.0"
 )
+app.openapi_version = "3.0.3"
+# Custom OpenAPI schema for Swagger file uploads
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
 
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+
+    openapi_schema["openapi"] = "3.0.3"
+
+    request_body = (
+        openapi_schema["paths"]["/api/screen-resumes"]["post"]
+        ["requestBody"]["content"]["multipart/form-data"]["schema"]
+    )
+
+    ref = request_body.get("$ref")
+
+    if ref:
+        schema_name = ref.split("/")[-1]
+        files_schema = (
+            openapi_schema["components"]["schemas"]
+            [schema_name]["properties"]["files"]
+        )
+
+        files_schema["items"].pop("contentMediaType", None)
+        files_schema["items"]["format"] = "binary"
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 # ==========================================
 # RESUME UPLOAD CONFIGURATION
@@ -75,7 +120,7 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 
 
 # ==========================================
-# FRONTEND CONNECTION
+# CORS CONFIGURATION
 # ==========================================
 
 app.add_middleware(
@@ -88,7 +133,7 @@ app.add_middleware(
 
 
 # ==========================================
-# RESUME TEXT EXTRACTION FUNCTIONS
+# RESUME TEXT EXTRACTION
 # ==========================================
 
 def extract_pdf_text(file_path):
@@ -110,6 +155,101 @@ def extract_docx_text(file_path):
     )
 
 
+def extract_experience(text_content):
+    """
+    Extract an explicitly stated number of years of experience.
+    Returns None when no reliable number is found.
+    """
+
+    patterns = [
+        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:relevant\s+)?(?:work\s+)?(?:experience|exp)",
+        r"(?:experience|exp)\s*[:\-]\s*(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)"
+    ]
+
+    for pattern in patterns:
+        match = re.search(
+            pattern,
+            text_content,
+            re.IGNORECASE
+        )
+
+        if match:
+            return float(match.group(1))
+
+    return None
+
+
+def extract_education(text_content):
+    pattern = (
+        r"(?:B\.?Tech|M\.?Tech|B\.?E\.?|B\.?S\.?|M\.?S\.?|"
+        r"Bachelor(?:'s)?|Master(?:'s)?|Ph\.?D)[^,\n.]*"
+    )
+
+    match = re.search(
+        pattern,
+        text_content,
+        re.IGNORECASE
+    )
+
+    return match.group(0).strip() if match else "Not specified"
+
+
+def calculate_experience_score(
+    detected_experience,
+    minimum_experience
+):
+    """
+    Does not invent experience when it is absent.
+    """
+
+    if detected_experience is None:
+        return 0.0
+
+    if minimum_experience <= 0:
+        return 100.0
+
+    return round(
+        min(
+            100.0,
+            max(
+                0.0,
+                (detected_experience / minimum_experience) * 100.0
+            )
+        ),
+        1
+    )
+
+
+def calculate_overall_score(
+    skill_score,
+    experience_score,
+    growth_score
+):
+    return round(
+        (skill_score * 0.45)
+        + (experience_score * 0.35)
+        + (growth_score * 0.20),
+        1
+    )
+
+
+def get_matched_skills(coverage):
+    """
+    SkillGraph uses required_skill in its match dictionaries.
+    """
+
+    matches = (
+        coverage.get("exact_matches", [])
+        + coverage.get("transferable_matches", [])
+    )
+
+    return [
+        match["required_skill"]
+        for match in matches
+        if match.get("required_skill")
+    ]
+
+
 # ==========================================
 # HOME API
 # ==========================================
@@ -123,7 +263,7 @@ def home():
 
 
 # ==========================================
-# HEALTH CHECK API
+# HEALTH CHECK
 # ==========================================
 
 @app.get("/health")
@@ -135,7 +275,7 @@ def health_check():
 
 
 # ==========================================
-# USER REGISTRATION API
+# USER REGISTRATION
 # ==========================================
 
 @app.post("/register")
@@ -199,11 +339,8 @@ def register_user(
 
     try:
         db.add(new_user)
-
-        # Generate the new user's ID before creating the profile
         db.flush()
 
-        # Automatically create a candidate profile
         if user.role == "candidate":
             candidate_profile = CandidateProfile(
                 user_id=new_user.id,
@@ -217,7 +354,6 @@ def register_user(
 
             db.add(candidate_profile)
 
-        # Save both records together
         db.commit()
         db.refresh(new_user)
 
@@ -229,6 +365,10 @@ def register_user(
             detail="An account with this email already exists."
         )
 
+    except Exception:
+        db.rollback()
+        raise
+
     return {
         "message": "Account created successfully!",
         "user_id": new_user.id,
@@ -239,7 +379,7 @@ def register_user(
 
 
 # ==========================================
-# USER LOGIN API
+# USER LOGIN
 # ==========================================
 
 @app.post("/login")
@@ -247,19 +387,16 @@ def login_user(
     user: UserLogin,
     db: Session = Depends(get_db)
 ):
-    # Find user by email
     existing_user = db.query(User).filter(
         User.email == user.email
     ).first()
 
-    # Check user existence
     if not existing_user:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password."
         )
 
-    # Verify password
     password_valid = verify_password(
         user.password,
         existing_user.password_hash
@@ -271,13 +408,11 @@ def login_user(
             detail="Invalid email or password."
         )
 
-    # Generate JWT token
     access_token = create_access_token({
         "sub": str(existing_user.id),
         "role": existing_user.role
     })
 
-    # Return login response
     return {
         "message": "Login successful!",
         "access_token": access_token,
@@ -310,24 +445,29 @@ def get_candidates(
                 cp.education,
                 cp.skills
             FROM candidate_profiles cp
-            JOIN users u
-                ON cp.user_id = u.id
+            JOIN users u ON cp.user_id = u.id
             WHERE u.role = 'candidate'
             ORDER BY cp.id DESC
         """)
     )
 
     candidates = []
+
     for row in result.fetchall():
-        d = dict(row._mapping)
-        if isinstance(d.get("skills"), str):
+        candidate = dict(row._mapping)
+
+        if isinstance(candidate.get("skills"), str):
             try:
-                d["skills"] = json.loads(d["skills"])
-            except Exception:
-                d["skills"] = []
-        elif not d.get("skills"):
-            d["skills"] = []
-        candidates.append(d)
+                candidate["skills"] = json.loads(
+                    candidate["skills"]
+                )
+            except (ValueError, TypeError):
+                candidate["skills"] = []
+
+        elif not candidate.get("skills"):
+            candidate["skills"] = []
+
+        candidates.append(candidate)
 
     return {
         "total_candidates": len(candidates),
@@ -358,8 +498,7 @@ def get_candidate_profile(
                 cp.resume_path,
                 cp.created_at
             FROM candidate_profiles cp
-            JOIN users u
-                ON cp.user_id = u.id
+            JOIN users u ON cp.user_id = u.id
             WHERE cp.id = :candidate_id
             AND u.role = 'candidate'
         """),
@@ -374,20 +513,24 @@ def get_candidate_profile(
             detail="Candidate profile not found."
         )
 
-    cand_dict = dict(candidate._mapping)
-    if isinstance(cand_dict.get("skills"), str):
-        try:
-            cand_dict["skills"] = json.loads(cand_dict["skills"])
-        except Exception:
-            cand_dict["skills"] = []
-    elif not cand_dict.get("skills"):
-        cand_dict["skills"] = []
+    candidate_dict = dict(candidate._mapping)
 
-    return cand_dict
+    if isinstance(candidate_dict.get("skills"), str):
+        try:
+            candidate_dict["skills"] = json.loads(
+                candidate_dict["skills"]
+            )
+        except (ValueError, TypeError):
+            candidate_dict["skills"] = []
+
+    elif not candidate_dict.get("skills"):
+        candidate_dict["skills"] = []
+
+    return candidate_dict
 
 
 # ==========================================
-# UPLOAD CANDIDATE RESUME API
+# UPLOAD CANDIDATE RESUME
 # ==========================================
 
 @app.post("/candidates/{candidate_id}/upload-resume")
@@ -396,14 +539,12 @@ async def upload_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    # 1. Validate filename
     if not file.filename:
         raise HTTPException(
             status_code=400,
             detail="Filename is required."
         )
 
-    # 2. Validate file extension
     file_extension = Path(file.filename).suffix.lower()
 
     if file_extension not in ALLOWED_EXTENSIONS:
@@ -412,7 +553,6 @@ async def upload_resume(
             detail="Only PDF and DOCX files are allowed."
         )
 
-    # 3. Check candidate existence
     candidate = db.execute(
         text("""
             SELECT id
@@ -428,7 +568,6 @@ async def upload_resume(
             detail="Candidate profile not found."
         )
 
-    # 4. Read file with size limit
     file_content = await file.read(MAX_FILE_SIZE + 1)
 
     if not file_content:
@@ -443,7 +582,6 @@ async def upload_resume(
             detail="File size must not exceed 5 MB."
         )
 
-    # 5. Validate basic file signature
     if file_extension == ".pdf":
         if not file_content.startswith(b"%PDF-"):
             raise HTTPException(
@@ -458,7 +596,6 @@ async def upload_resume(
                 detail="Invalid DOCX file."
             )
 
-    # 6. Generate unique filename
     unique_filename = (
         f"{candidate_id}_{uuid.uuid4().hex}{file_extension}"
     )
@@ -466,11 +603,9 @@ async def upload_resume(
     file_path = UPLOAD_DIR / unique_filename
 
     try:
-        # 7. Save resume
         with open(file_path, "wb") as uploaded_file:
             uploaded_file.write(file_content)
 
-        # 8. Extract resume text
         if file_extension == ".pdf":
             extracted_text = extract_pdf_text(file_path)
         else:
@@ -481,7 +616,6 @@ async def upload_resume(
                 "No readable text found in the resume."
             )
 
-        # 9. Update candidate database record
         db.execute(
             text("""
                 UPDATE candidate_profiles
@@ -496,7 +630,6 @@ async def upload_resume(
 
         db.commit()
 
-        # 10. Return successful response
         return {
             "message": "Resume uploaded successfully!",
             "candidate_id": candidate_id,
@@ -531,7 +664,7 @@ async def upload_resume(
 
 
 # ==========================================
-# HAWKEYE / HIRELENS AI API LAYER (F1 - F11)
+# REQUEST MODELS
 # ==========================================
 
 class JDBiasRequest(BaseModel):
@@ -548,9 +681,18 @@ class WhatIfRequest(BaseModel):
     weights: Dict[str, float]
 
 
+class JDExtractRequest(BaseModel):
+    job_description: str
+
+
+# ==========================================
+# GET JOBS
+# ==========================================
+
 @app.get("/api/jobs")
-def get_jobs(db: Session = Depends(get_db)):
-    """Returns available job descriptions. Seeds default demo jobs if empty."""
+def get_jobs(
+    db: Session = Depends(get_db)
+):
     jobs = db.query(Job).all()
 
     if not jobs:
@@ -559,8 +701,15 @@ def get_jobs(db: Session = Depends(get_db)):
                 title="Senior Full-Stack Engineer",
                 department="Platform Engineering",
                 location="Remote / Hybrid",
-                description="We are looking for a Senior Full-Stack Engineer to build scalable microservices and real-time reactive user interfaces. You will architect high-throughput APIs, lead technical design, and containerize distributed services.",
-                requirements_text="Python, FastAPI, React, PostgreSQL, Docker, Kubernetes, CI/CD",
+                description=(
+                    "We are looking for a Senior Full-Stack Engineer "
+                    "to build scalable microservices and real-time "
+                    "reactive user interfaces."
+                ),
+                requirements_text=(
+                    "Python, FastAPI, React, PostgreSQL, "
+                    "Docker, Kubernetes, CI/CD"
+                ),
                 experience_min=4,
                 bias_score=0.0
             ),
@@ -568,8 +717,14 @@ def get_jobs(db: Session = Depends(get_db)):
                 title="AI / ML Systems Engineer",
                 department="AI Research & Products",
                 location="Bengaluru, India",
-                description="Seeking an exceptional engineer to deploy LLM pipelines, vector databases, and semantic search architectures.",
-                requirements_text="Python, PyTorch, LLMs, Vector Databases, FastAPI, Docker",
+                description=(
+                    "Seeking an engineer to deploy LLM pipelines, "
+                    "vector databases, and semantic search architectures."
+                ),
+                requirements_text=(
+                    "Python, PyTorch, LLMs, Vector Databases, "
+                    "FastAPI, Docker"
+                ),
                 experience_min=3,
                 bias_score=0.1
             )
@@ -581,46 +736,51 @@ def get_jobs(db: Session = Depends(get_db)):
 
     return [
         {
-            "id": j.id,
-            "title": j.title,
-            "department": j.department,
-            "location": j.location,
-            "description": j.description,
+            "id": job.id,
+            "title": job.title,
+            "department": job.department,
+            "location": job.location,
+            "description": job.description,
             "requirements": [
-                r.strip()
-                for r in (j.requirements_text or "").split(",")
-                if r.strip()
+                item.strip()
+                for item in (job.requirements_text or "").split(",")
+                if item.strip()
             ],
-            "experience_min": j.experience_min,
-            "bias_score": j.bias_score
+            "experience_min": job.experience_min,
+            "bias_score": job.bias_score
         }
-        for j in jobs
+        for job in jobs
     ]
 
 
-@app.post("/api/jobs/analyze-bias")
-def analyze_job_bias(request: JDBiasRequest):
-    """F8: Job Description Bias Analyzer with side-by-side inclusive rewrite."""
+# ==========================================
+# JOB DESCRIPTION BIAS ANALYZER
+# ==========================================
 
+@app.post("/api/jobs/analyze-bias")
+def analyze_job_bias(
+    request: JDBiasRequest
+):
     if not request.jd_text.strip():
         raise HTTPException(
             status_code=400,
             detail="Job description text is required."
         )
 
-    return screening_engine.analyze_jd_bias(request.jd_text)
+    return screening_engine.analyze_jd_bias(
+        request.jd_text
+    )
 
+
+# ==========================================
+# SCREEN INDIVIDUAL CANDIDATE
+# ==========================================
 
 @app.post("/api/screen-candidate")
 def screen_candidate(
     request: ScreenCandidateRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Core AI Screening Pipeline (F1, F2, F3, F4, F7, F10).
-    Runs skill extraction, graph coverage, growth potential, evidence trails, and claim verifications.
-    """
-
     candidate = db.query(CandidateProfile).filter_by(
         id=request.candidate_id
     ).first()
@@ -636,60 +796,62 @@ def screen_candidate(
     ).first()
 
     raw_name = user.full_name if user else "Candidate"
-    blind_id = candidate.blind_id or f"Candidate #C-{candidate.id:04d}"
 
-    # Target Job requirements
+    blind_id = (
+        candidate.blind_id
+        or f"Candidate #C-{candidate.id:04d}"
+    )
+
     job = db.query(Job).filter_by(
         id=request.job_id
     ).first()
 
     if job and job.requirements_text:
         job_requirements = [
-            r.strip()
-            for r in job.requirements_text.split(",")
-            if r.strip()
+            item.strip()
+            for item in job.requirements_text.split(",")
+            if item.strip()
         ]
     else:
         job_requirements = [
-            "Python", "FastAPI", "React", "Docker", "PostgreSQL"
+            "Python",
+            "FastAPI",
+            "React",
+            "Docker",
+            "PostgreSQL"
         ]
 
-    # Retrieve candidate resume text if available
-    resume_record = db.query(Resume).filter_by(
-        candidate_id=candidate.id
-    ).order_by(Resume.id.desc()).first()
+    resume_record = (
+        db.query(Resume)
+        .filter_by(candidate_id=candidate.id)
+        .order_by(Resume.id.desc())
+        .first()
+    )
 
     if resume_record and resume_record.raw_text:
         resume_text = resume_record.raw_text
     else:
-        skills_str = ", ".join(
-            candidate.skills or [
-                "Python", "FastAPI", "React", "Docker", "PostgreSQL"
-            ]
-        )
+        skills = candidate.skills or []
+
+        if isinstance(skills, str):
+            try:
+                skills = json.loads(skills)
+            except (ValueError, TypeError):
+                skills = []
+
+        skills_str = ", ".join(skills)
 
         resume_text = f"""
 {raw_name}
-{candidate.headline or 'Full-Stack Software Engineer'}
-Location: {candidate.location or 'Bengaluru, India'}
-Experience: {candidate.experience_years} years. Education: {candidate.education or 'B.Tech in Computer Science'}
-
-EXPERIENCE
-Software Engineer (2021 - Present)
-- Designed and maintained high-throughput REST APIs using FastAPI and PostgreSQL handling 10M requests daily.
-- Containerized microservices using Docker and orchestrated automated deployments with CI/CD pipelines.
-- Collaborated across an Agile / Scrum team conducting daily code reviews.
-
-PROJECTS
-High-Scale Web Application
-- Built reactive frontend with React and responsive layouts.
-- Integrated Redis caching and monitored backend latency.
+{candidate.headline or 'Software Engineer'}
+Location: {candidate.location or 'Not specified'}
+Experience: {candidate.experience_years or 0} years.
+Education: {candidate.education or 'Not specified'}
 
 SKILLS
 {skills_str}
 """
 
-    # Blind screening mode
     if request.blind_mode:
         resume_text = ResumeParser.anonymize_text(
             resume_text,
@@ -706,7 +868,6 @@ SKILLS
         blind_id=blind_id
     )
 
-    # Log audit event
     audit = AuditLog(
         action="CANDIDATE_SCREENED",
         entity_type="CANDIDATE",
@@ -717,36 +878,53 @@ SKILLS
         }
     )
 
-    db.add(audit)
-    db.commit()
+    try:
+        db.add(audit)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return result
 
+
+# ==========================================
+# WHAT-IF WEIGHT SIMULATOR
+# ==========================================
 
 @app.post("/api/what-if-simulate")
 def what_if_simulate(
     request: WhatIfRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    F11: Recruiter What-If Weight Simulator.
-    Simulates dynamic leaderboard ranking based on recruiter's customized factor weights.
-    """
-
     candidates = db.query(CandidateProfile).all()
     results = []
 
-    for c in candidates:
-        user = db.query(User).filter_by(id=c.user_id).first()
+    for candidate in candidates:
+        user = db.query(User).filter_by(
+            id=candidate.user_id
+        ).first()
+
+        skills = candidate.skills or []
+
+        if isinstance(skills, str):
+            try:
+                skills = json.loads(skills)
+            except (ValueError, TypeError):
+                skills = []
 
         base_skill_score = min(
             98.0,
-            60.0 + len(c.skills or []) * 5.0
+            60.0 + len(skills) * 5.0
+        )
+
+        experience = float(
+            candidate.experience_years or 0.0
         )
 
         base_exp_score = min(
-            95.0,
-            50.0 + (c.experience_years or 2.0) * 8.0
+            100.0,
+            experience * 10.0
         )
 
         base_growth_score = 85.0
@@ -762,78 +940,104 @@ def what_if_simulate(
             request.weights
         )
 
+        original_score = (
+            base_skill_score * 0.45
+            + base_exp_score * 0.35
+            + base_growth_score * 0.20
+        )
+
         results.append({
-            "id": c.id,
-            "full_name": user.full_name if user else "Candidate",
-            "blind_id": c.blind_id or f"Candidate #C-{c.id:04d}",
-            "headline": c.headline,
-            "experience_years": c.experience_years,
-            "original_score": round(
-                (base_skill_score * 0.45) +
-                (base_exp_score * 0.35) +
-                (base_growth_score * 0.20),
-                1
+            "id": candidate.id,
+            "full_name": (
+                user.full_name if user else "Candidate"
             ),
+            "blind_id": (
+                candidate.blind_id
+                or f"Candidate #C-{candidate.id:04d}"
+            ),
+            "headline": candidate.headline,
+            "experience_years": experience,
+            "original_score": round(original_score, 1),
             "simulated_score": adjusted_score,
             "scores": scores
         })
 
     results.sort(
-        key=lambda x: x["simulated_score"],
+        key=lambda item: item["simulated_score"],
         reverse=True
     )
 
     for rank, item in enumerate(results, 1):
         item["rank"] = rank
 
-    return {"simulated_candidates": results}
+    return {
+        "simulated_candidates": results
+    }
 
+
+# ==========================================
+# SKILL GRAPH API
+# ==========================================
 
 @app.get("/api/skills/graph")
 def get_skill_graph():
-    """Returns nodes and edges for visual Skill Graph rendering."""
-
     nodes = [
         {
-            "id": n,
-            "category": skill_graph.graph.nodes[n].get("category", "general")
+            "id": node,
+            "category": skill_graph.graph.nodes[node].get(
+                "category",
+                "general"
+            )
         }
-        for n in skill_graph.graph.nodes()
+        for node in skill_graph.graph.nodes()
     ]
 
     edges = [
         {
-            "source": u,
-            "target": v,
-            "relation_type": data.get("relation_type", "related_to"),
+            "source": source,
+            "target": target,
+            "relation_type": data.get(
+                "relation_type",
+                "related_to"
+            ),
             "weight": data.get("weight", 1.0)
         }
-        for u, v, data in skill_graph.graph.edges(data=True)
+        for source, target, data in skill_graph.graph.edges(
+            data=True
+        )
     ]
 
-    return {"nodes": nodes, "edges": edges}
+    return {
+        "nodes": nodes,
+        "edges": edges
+    }
 
 
 # ==========================================
-# END-TO-END RESUME SCREENING & JD ANALYSIS
+# EXTRACT JOB DESCRIPTION REQUIREMENTS
 # ==========================================
-
-class JDExtractRequest(BaseModel):
-    job_description: str
-
 
 @app.post("/api/extract-jd-requirements")
-def extract_jd_requirements(request: JDExtractRequest):
-    """
-    Extracts required skills, experience, qualifications, and bias metrics from JD text.
-    """
-
+def extract_jd_requirements(
+    request: JDExtractRequest
+):
     jd_text = request.job_description or ""
-    extracted = skill_extractor.extract_from_text(jd_text)
 
-    # Extract suggested title
+    if not jd_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Job description is required."
+        )
+
+    extracted = skill_extractor.extract_from_text(
+        jd_text
+    )
+
     title_match = re.search(
-        r"(?:position|role|title|looking for|seeking)\s*[:\-]?\s*([A-Za-z\s/-]+(?:Engineer|Developer|Architect|Scientist|Specialist|Manager|Consultant))",
+        r"(?:position|role|title|looking for|seeking)"
+        r"\s*[:\-]?\s*([A-Za-z\s/-]+"
+        r"(?:Engineer|Developer|Architect|Scientist|"
+        r"Specialist|Manager|Consultant))",
         jd_text,
         re.IGNORECASE
     )
@@ -844,34 +1048,49 @@ def extract_jd_requirements(request: JDExtractRequest):
         else "Software Engineer"
     )
 
-    # Extract minimum experience
     exp_match = re.search(
-        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp)",
+        r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)"
+        r"(?:\s+of)?\s+(?:experience|exp)",
         jd_text,
         re.IGNORECASE
     )
 
-    min_exp = float(exp_match.group(1)) if exp_match else 2.0
+    min_exp = (
+        float(exp_match.group(1))
+        if exp_match
+        else 2.0
+    )
 
-    # Analyze JD Bias
-    bias_res = screening_engine.analyze_jd_bias(jd_text)
+    bias_result = screening_engine.analyze_jd_bias(
+        jd_text
+    )
 
     return {
         "suggested_title": suggested_title,
         "extracted_skills": extracted.skill_names,
         "min_experience": min_exp,
-        "bias_analysis": bias_res
+        "bias_analysis": bias_result
     }
 
+
+# ==========================================
+# TOGGLE CANDIDATE SHORTLIST
+# ==========================================
 
 @app.post("/api/candidates/{candidate_id}/toggle-shortlist")
 def toggle_shortlist(
     candidate_id: int,
     db: Session = Depends(get_db)
 ):
-    """
-    Toggles a candidate's shortlist status in the recruiter decision pipeline.
-    """
+    candidate = db.query(CandidateProfile).filter_by(
+        id=candidate_id
+    ).first()
+
+    if not candidate:
+        raise HTTPException(
+            status_code=404,
+            detail="Candidate not found."
+        )
 
     decision = db.query(RecruiterDecision).filter_by(
         candidate_id=candidate_id
@@ -898,7 +1117,11 @@ def toggle_shortlist(
             decision.stage = "shortlisted"
             is_shortlisted = True
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "candidate_id": candidate_id,
@@ -907,29 +1130,40 @@ def toggle_shortlist(
     }
 
 
+# ==========================================
+# END-TO-END RESUME SCREENING
+# ==========================================
+
 @app.post("/api/screen-resumes")
 async def screen_resumes(
-    files: Optional[List[UploadFile]] = File(None),
+    files: List[UploadFile] = File(None),
     job_title: str = Form("Senior Software Engineer"),
     job_description: str = Form(""),
-    required_skills: str = Form("Python, FastAPI, React, Docker, PostgreSQL"),
+    required_skills: str = Form(
+        "Python, FastAPI, React, Docker, PostgreSQL"
+    ),
     min_experience: float = Form(2.0),
     blind_mode: bool = Form(False),
     include_benchmarks: bool = Form(True),
     db: Session = Depends(get_db)
 ):
     """
-    Advanced real-time AI Resume Screening & Candidate Ranking pipeline.
-    Accepts multiple uploaded PDF/DOCX/TXT resumes, parses text, extracts skills & experience,
-    runs semantic skill graph matching, and ranks all candidates with explainable AI scores,
-    summaries, and recommendations.
+    Processes uploaded resumes, extracts skills,
+    calculates explainable scores, and ranks candidates.
     """
 
-    # 1. Parse required skills list
+    if min_experience < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Minimum experience cannot be negative."
+        )
+
+    # 1. Determine required skills
+
     target_skills = [
-        s.strip()
-        for s in required_skills.split(",")
-        if s.strip()
+        skill.strip()
+        for skill in required_skills.split(",")
+        if skill.strip()
     ]
 
     if not target_skills and job_description:
@@ -937,54 +1171,73 @@ async def screen_resumes(
             job_description
         )
 
-        target_skills = (
-            extracted_from_jd.skill_names or [
-                "Python", "FastAPI", "React", "Docker", "PostgreSQL"
-            ]
-        )
+        target_skills = extracted_from_jd.skill_names
 
-    elif not target_skills:
+    if not target_skills:
         target_skills = [
-            "Python", "FastAPI", "React", "Docker", "PostgreSQL"
+            "Python",
+            "FastAPI",
+            "React",
+            "Docker",
+            "PostgreSQL"
         ]
 
     ranked_results = []
     seen_names = set()
 
-    # 2. Process uploaded resume files
+    # 2. Process uploaded resumes
+
     if files:
-        for f_idx, file in enumerate(files):
+        for file_index, file in enumerate(files):
+
             if not file.filename:
                 continue
 
-            ext = Path(file.filename).suffix.lower()
+            extension = Path(file.filename).suffix.lower()
 
-            if ext not in [".pdf", ".docx", ".txt"]:
+            if extension not in [".pdf", ".docx", ".txt"]:
                 continue
 
-            content = await file.read()
+            content = await file.read(MAX_FILE_SIZE + 1)
+
+            if not content:
+                continue
+
+            if len(content) > MAX_FILE_SIZE:
+                continue
+
             raw_text = ""
 
             try:
-                if ext == ".pdf":
+                if extension == ".pdf":
+                    if not content.startswith(b"%PDF-"):
+                        continue
+
                     with fitz.open(
                         stream=content,
                         filetype="pdf"
-                    ) as pdf_doc:
+                    ) as pdf_document:
+
                         raw_text = "\n".join(
                             page.get_text()
-                            for page in pdf_doc
+                            for page in pdf_document
                         )
 
-                elif ext == ".docx":
-                    docx_doc = Document(io.BytesIO(content))
-                    raw_text = "\n".join(
-                        p.text
-                        for p in docx_doc.paragraphs
-                        if p.text.strip()
+                elif extension == ".docx":
+                    if not content.startswith(b"PK"):
+                        continue
+
+                    document = Document(
+                        io.BytesIO(content)
                     )
 
-                elif ext == ".txt":
+                    raw_text = "\n".join(
+                        paragraph.text
+                        for paragraph in document.paragraphs
+                        if paragraph.text.strip()
+                    )
+
+                elif extension == ".txt":
                     raw_text = content.decode(
                         "utf-8",
                         errors="ignore"
@@ -996,184 +1249,186 @@ async def screen_resumes(
             if not raw_text.strip():
                 continue
 
-            # Extract Candidate Name
+            # Extract candidate name
+
             lines = [
-                l.strip()
-                for l in raw_text.splitlines()
-                if l.strip()
+                line.strip()
+                for line in raw_text.splitlines()
+                if line.strip()
             ]
 
             candidate_name = ""
 
-            for l in lines[:5]:
-                clean_l = re.sub(
+            for line in lines[:5]:
+                clean_line = re.sub(
                     r"[^a-zA-Z\s]",
                     "",
-                    l
+                    line
                 ).strip()
 
-                words = clean_l.split()
+                words = clean_line.split()
 
                 if (
                     2 <= len(words) <= 4
                     and not any(
-                        w.lower() in [
-                            "resume", "curriculum", "vitae",
-                            "profile", "contact", "summary", "page"
-                        ]
-                        for w in words
+                        word.lower() in {
+                            "resume",
+                            "curriculum",
+                            "vitae",
+                            "profile",
+                            "contact",
+                            "summary",
+                            "page"
+                        }
+                        for word in words
                     )
                 ):
-                    candidate_name = clean_l
+                    candidate_name = clean_line
                     break
 
             if not candidate_name:
-                stem = Path(file.filename).stem
                 candidate_name = (
-                    stem.replace("_", " ")
+                    Path(file.filename)
+                    .stem
+                    .replace("_", " ")
                     .replace("-", " ")
                     .title()
                 )
 
-            # Extract Experience
-            exp_match = re.search(
-                r"(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:experience|exp)",
-                raw_text,
-                re.IGNORECASE
-            )
+            # Extract experience and education
 
-            detected_exp = (
-                float(exp_match.group(1))
-                if exp_match
-                else round(min_experience + 1.0, 1)
-            )
+            detected_exp = extract_experience(raw_text)
+            detected_edu = extract_education(raw_text)
 
-            # Extract Education
-            edu_match = re.search(
-                r"(?:B\.?Tech|M\.?Tech|B\.?E\.?|B\.?S\.?|M\.?S\.?|Bachelor|Master|Ph\.?D)[^,\n.]*",
-                raw_text,
-                re.IGNORECASE
-            )
-
-            detected_edu = (
-                edu_match.group(0).strip()
-                if edu_match
-                else "B.Tech in Computer Science"
+            experience_label = (
+                f"{detected_exp} years"
+                if detected_exp is not None
+                else "Not specified"
             )
 
             headline = (
-                f"{target_skills[0] if target_skills else 'Software'} "
-                f"Specialist • {detected_exp} Yrs Exp"
+                f"{target_skills[0]} Specialist"
             )
 
-            # Parse Skills & Evaluate Coverage
-            sections = ResumeParser.segment_sections(raw_text)
+            # Extract skills
 
-            skill_res = skill_extractor.extract_from_text(
+            sections = ResumeParser.segment_sections(
+                raw_text
+            )
+
+            skill_result = skill_extractor.extract_from_text(
                 raw_text,
                 sections
             )
 
             coverage = skill_graph.evaluate_skill_coverage(
-                skill_res.skill_names,
+                skill_result.skill_names,
                 target_skills
             )
 
             skill_score = coverage["coverage_score"]
 
-            exp_score = min(
-                100.0,
-                max(
-                    45.0,
-                    65.0 + (detected_exp - min_experience) * 8.0
-                )
+            experience_score = calculate_experience_score(
+                detected_exp,
+                min_experience
             )
 
             growth_score = min(
                 98.0,
-                55.0 + len(skill_res.skills) * 2.5
+                55.0 + len(skill_result.skills) * 2.5
             )
 
-            overall_score = round(
-                (skill_score * 0.45) +
-                (exp_score * 0.35) +
-                (growth_score * 0.20),
-                1
+            overall_score = calculate_overall_score(
+                skill_score,
+                experience_score,
+                growth_score
             )
 
-           matched_skills = [
-    m["required_skill"]
-    for m in (
-        coverage["exact_matches"] +
-        coverage["transferable_matches"]
-    )
-]
+            matched_skills = get_matched_skills(
+                coverage
+            )
 
-            missing_skills = coverage["missing_skills"]
+            missing_skills = coverage.get(
+                "missing_skills",
+                []
+            )
 
-            # AI Summary
-            top_skills_str = (
-                ", ".join(skill_res.skill_names[:4])
-                if skill_res.skill_names
-                else "Software Development"
+            # Generate summary using extracted information
+
+            top_skills = (
+                ", ".join(skill_result.skill_names[:4])
+                if skill_result.skill_names
+                else "No technical skills detected"
             )
 
             ai_summary = (
-                f"{candidate_name} brings {detected_exp} years of "
-                f"relevant engineering background with demonstrated "
-                f"experience in {top_skills_str}. Education background "
-                f"in {detected_edu}. Demonstrates practical proficiency "
-                f"across {len(skill_res.skills)} verified technical competencies."
+                f"{candidate_name} has the following extracted "
+                f"technical skills: {top_skills}. "
+                f"Experience: {experience_label}. "
+                f"Education: {detected_edu}. "
+                f"This summary is based on information extracted "
+                f"from the uploaded resume."
             )
 
-            # AI Recommendation
+            # Generate recommendation
+
             if overall_score >= 82:
-                rec_text = (
+                recommendation = (
                     f"Top Recommendation ({overall_score}% Match): "
-                    f"Strong fit for {job_title}. Demonstrates direct "
-                    f"coverage across {len(matched_skills)} key requirements "
-                    f"({', '.join(matched_skills[:3])}). Prior experience "
-                    f"aligns closely with required scope. Missing requirements "
-                    f"({', '.join(missing_skills) if missing_skills else 'None'}) "
-                    f"can be easily acquired."
+                    f"Strong alignment with {job_title}. "
+                    f"Matched skills: "
+                    f"{', '.join(matched_skills[:3]) or 'None'}. "
+                    f"Missing skills: "
+                    f"{', '.join(missing_skills) or 'None'}."
                 )
 
             elif overall_score >= 68:
-                rec_text = (
+                recommendation = (
                     f"Strong Potential ({overall_score}% Match): "
-                    f"Meets foundational requirements in "
-                    f"{', '.join(matched_skills[:3])}. Solid {detected_exp} "
-                    f"years background. Identified gap in "
-                    f"{', '.join(missing_skills[:2]) if missing_skills else 'specialized tooling'}, "
-                    f"recommended for technical phone screening."
+                    f"Some requirements match the candidate profile. "
+                    f"Matched skills: "
+                    f"{', '.join(matched_skills[:3]) or 'None'}. "
+                    f"Missing skills: "
+                    f"{', '.join(missing_skills[:3]) or 'None'}."
                 )
 
             else:
-                rec_text = (
+                recommendation = (
                     f"Moderate Alignment ({overall_score}% Match): "
-                    f"Partial skill overlap on "
-                    f"{', '.join(matched_skills) if matched_skills else 'general engineering'}. "
-                    f"Missing key required competencies "
-                    f"({', '.join(missing_skills[:3])}). Advise reviewing "
-                    f"for junior or alternative tracks."
+                    f"Additional review may be required. "
+                    f"Matched skills: "
+                    f"{', '.join(matched_skills[:3]) or 'None'}. "
+                    f"Missing skills: "
+                    f"{', '.join(missing_skills[:3]) or 'None'}."
                 )
+
+            # Evidence from extracted resume text
 
             evidence = []
 
-            for s in skill_res.skills[:4]:
-                if s.evidence_sentences:
+            for extracted_skill in skill_result.skills[:4]:
+                if extracted_skill.evidence_sentences:
                     evidence.append({
-                        "skill": s.name,
-                        "quote": s.evidence_sentences[0]
+                        "skill": extracted_skill.name,
+                        "quote": (
+                            extracted_skill.evidence_sentences[0]
+                        )
                     })
 
-            blind_id = f"Candidate #U-{1000 + f_idx}"
-            display_name = blind_id if blind_mode else candidate_name
+            blind_id = (
+                f"Candidate #U-{1000 + file_index}"
+            )
+
+            display_name = (
+                blind_id
+                if blind_mode
+                else candidate_name
+            )
 
             seen_names.add(candidate_name.lower())
 
             ranked_results.append({
-                "id": 1000 + f_idx,
+                "id": 1000 + file_index,
                 "candidate_name": display_name,
                 "raw_name": candidate_name,
                 "blind_id": blind_id,
@@ -1182,91 +1437,98 @@ async def screen_resumes(
                 "headline": headline,
                 "experience_years": detected_exp,
                 "education": (
-                    "Verified Degree • " + detected_edu
-                    if not blind_mode
-                    else "Degree Verified"
+                    "Not specified"
+                    if blind_mode
+                    else detected_edu
                 ),
                 "overall_score": overall_score,
                 "skill_score": skill_score,
-                "experience_score": exp_score,
+                "experience_score": experience_score,
                 "growth_score": growth_score,
                 "matched_skills": matched_skills,
                 "missing_skills": missing_skills,
                 "ai_summary": ai_summary,
-                "ai_recommendation": rec_text,
+                "ai_recommendation": recommendation,
                 "evidence_trail": evidence,
                 "is_shortlisted": False
             })
 
-    # 3. Process Benchmark Candidates from Database
-    if include_benchmarks or not ranked_results:
-        db_candidates = db.query(CandidateProfile).all()
+    # 3. Process benchmark candidates
 
-        for cand in db_candidates:
+    if include_benchmarks or not ranked_results:
+
+        db_candidates = db.query(
+            CandidateProfile
+        ).all()
+
+        for candidate in db_candidates:
+
             user = db.query(User).filter_by(
-                id=cand.user_id
+                id=candidate.user_id
             ).first()
 
-            raw_cand_name = (
+            raw_candidate_name = (
                 user.full_name
                 if user
-                else f"Candidate #{cand.id}"
+                else f"Candidate #{candidate.id}"
             )
 
-            if raw_cand_name.lower() in seen_names:
+            if raw_candidate_name.lower() in seen_names:
                 continue
 
-            cand_skills = cand.skills or []
+            candidate_skills = candidate.skills or []
 
-            if isinstance(cand_skills, str):
+            if isinstance(candidate_skills, str):
                 try:
-                    cand_skills = json.loads(cand_skills)
-                except Exception:
-                    cand_skills = [
-                        "Python", "FastAPI", "React"
-                    ]
+                    candidate_skills = json.loads(
+                        candidate_skills
+                    )
+                except (ValueError, TypeError):
+                    candidate_skills = []
+
+            if not isinstance(candidate_skills, list):
+                candidate_skills = []
 
             coverage = skill_graph.evaluate_skill_coverage(
-                cand_skills,
+                candidate_skills,
                 target_skills
             )
 
             skill_score = coverage["coverage_score"]
 
-            c_exp = float(cand.experience_years or 2.0)
+            candidate_experience = float(
+                candidate.experience_years or 0.0
+            )
 
-            exp_score = min(
-                100.0,
-                max(
-                    45.0,
-                    65.0 + (c_exp - min_experience) * 8.0
-                )
+            experience_score = calculate_experience_score(
+                candidate_experience,
+                min_experience
             )
 
             growth_score = min(
                 98.0,
-                60.0 + len(cand_skills) * 2.8
+                60.0 + len(candidate_skills) * 2.8
             )
 
-            overall_score = round(
-                (skill_score * 0.45) +
-                (exp_score * 0.35) +
-                (growth_score * 0.20),
-                1
+            overall_score = calculate_overall_score(
+                skill_score,
+                experience_score,
+                growth_score
             )
 
-            matched_skills = [
-                m["required_skill"]
-                for m in (
-                    coverage["exact_matches"] +
-                    coverage["transferable_matches"]
-                )
-            ]
+            matched_skills = get_matched_skills(
+                coverage
+            )
 
-            missing_skills = coverage["missing_skills"]
+            missing_skills = coverage.get(
+                "missing_skills",
+                []
+            )
 
-            decision = db.query(RecruiterDecision).filter_by(
-                candidate_id=cand.id
+            decision = db.query(
+                RecruiterDecision
+            ).filter_by(
+                candidate_id=candidate.id
             ).first()
 
             is_shortlisted = (
@@ -1276,107 +1538,99 @@ async def screen_resumes(
             )
 
             blind_id = (
-                cand.blind_id
-                or f"Candidate #C-{cand.id:04d}"
+                candidate.blind_id
+                or f"Candidate #C-{candidate.id:04d}"
             )
 
             display_name = (
                 blind_id
                 if blind_mode
-                else raw_cand_name
+                else raw_candidate_name
             )
 
-            top_skills_str = (
-                ", ".join(cand_skills[:4])
-                if cand_skills
-                else "Full Stack Engineering"
+            top_skills = (
+                ", ".join(candidate_skills[:4])
+                if candidate_skills
+                else "No skills listed"
             )
 
             ai_summary = (
-                f"{raw_cand_name} is a "
-                f"{cand.headline or 'Software Engineer'} "
-                f"with {c_exp} years of hands-on experience in "
-                f"{top_skills_str}. Education: "
-                f"{cand.education or 'B.Tech in Computer Science'}. "
-                f"Background includes proven contributions to "
-                f"high-throughput production systems."
+                f"{raw_candidate_name} has the headline "
+                f"{candidate.headline or 'Not specified'}. "
+                f"Listed skills: {top_skills}. "
+                f"Experience: {candidate_experience} years. "
+                f"Education: {candidate.education or 'Not specified'}."
             )
 
             if overall_score >= 82:
-                rec_text = (
+                recommendation = (
                     f"Top Recommendation ({overall_score}% Match): "
-                    f"Highly compatible candidate for {job_title}. "
-                    f"Directly fulfills {len(matched_skills)} core "
-                    f"technical competencies ({', '.join(matched_skills[:3])}). "
-                    f"Substantial domain track record with minimal "
-                    f"ramp-up time required."
+                    f"Strong profile alignment. "
+                    f"Matched skills: "
+                    f"{', '.join(matched_skills[:3]) or 'None'}."
                 )
 
             elif overall_score >= 68:
-                rec_text = (
+                recommendation = (
                     f"Strong Potential ({overall_score}% Match): "
-                    f"Good overall alignment with {len(matched_skills)} "
-                    f"matched competencies ({', '.join(matched_skills[:3])}). "
-                    f"Experience is relevant; missing skill in "
-                    f"{', '.join(missing_skills[:2]) if missing_skills else 'niche areas'} "
-                    f"is offset by strong transferable skills."
+                    f"Some required competencies are present. "
+                    f"Missing skills: "
+                    f"{', '.join(missing_skills[:3]) or 'None'}."
                 )
 
             else:
-                rec_text = (
+                recommendation = (
                     f"Alternative Match ({overall_score}% Match): "
-                    f"Shows solid general ability but currently missing "
-                    f"key specific requirements ({', '.join(missing_skills[:3])}). "
-                    f"Recommended keeping in talent pool for future openings."
+                    f"Further evaluation is recommended."
                 )
 
-            evidence = [
-                {
-                    "skill": s,
-                    "quote": (
-                        f"Demonstrated practical application of {s} "
-                        f"across scalable production services."
-                    )
-                }
-                for s in matched_skills[:3]
-            ]
+            # Do not manufacture evidence quotes for benchmark records.
+            evidence = []
 
             ranked_results.append({
-                "id": cand.id,
+                "id": candidate.id,
                 "candidate_name": display_name,
-                "raw_name": raw_cand_name,
+                "raw_name": raw_candidate_name,
                 "blind_id": blind_id,
                 "is_uploaded": False,
-                "filename": cand.resume_path or "profile_record.pdf",
-                "headline": cand.headline or "Software Engineer",
-                "experience_years": c_exp,
+                "filename": (
+                    candidate.resume_path
+                    or "No resume file recorded"
+                ),
+                "headline": (
+                    candidate.headline
+                    or "Software Engineer"
+                ),
+                "experience_years": candidate_experience,
                 "education": (
-                    cand.education or "B.Tech in Computer Science"
-                    if not blind_mode
-                    else "Degree Verified"
+                    "Not specified"
+                    if blind_mode
+                    else candidate.education or "Not specified"
                 ),
                 "overall_score": overall_score,
                 "skill_score": skill_score,
-                "experience_score": exp_score,
+                "experience_score": experience_score,
                 "growth_score": growth_score,
                 "matched_skills": matched_skills,
                 "missing_skills": missing_skills,
                 "ai_summary": ai_summary,
-                "ai_recommendation": rec_text,
+                "ai_recommendation": recommendation,
                 "evidence_trail": evidence,
                 "is_shortlisted": is_shortlisted
             })
 
-    # 4. Sort and assign Rank
+    # 4. Sort candidates and assign ranks
+
     ranked_results.sort(
-        key=lambda x: x["overall_score"],
+        key=lambda item: item["overall_score"],
         reverse=True
     )
 
     for rank, item in enumerate(ranked_results, 1):
         item["rank"] = rank
 
-    # 5. Log audit action
+    # 5. Log screening activity
+
     audit = AuditLog(
         action="RESUMES_SCREENED",
         entity_type="JOB",
@@ -1388,8 +1642,12 @@ async def screen_resumes(
         }
     )
 
-    db.add(audit)
-    db.commit()
+    try:
+        db.add(audit)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "job_title": job_title,
@@ -1398,3 +1656,44 @@ async def screen_resumes(
         "blind_mode": blind_mode,
         "ranked_candidates": ranked_results
     }
+# ==========================================
+# CUSTOM OPENAPI FOR SWAGGER FILE UPLOADS
+# ==========================================
+from fastapi.openapi.utils import get_openapi
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        openapi_version="3.0.3"
+    )
+
+    schema = (
+        openapi_schema["paths"]
+        ["/api/screen-resumes"]["post"]
+        ["requestBody"]["content"]
+        ["multipart/form-data"]["schema"]
+    )
+
+    ref = schema.get("$ref")
+
+    if ref:
+        schema_name = ref.split("/")[-1]
+
+        files_schema = (
+            openapi_schema["components"]["schemas"]
+            [schema_name]["properties"]["files"]
+        )
+
+        files_schema["items"].pop("contentMediaType", None)
+        files_schema["items"]["format"] = "binary"
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
