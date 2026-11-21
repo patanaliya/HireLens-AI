@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 export default function CandidateProfile() {
@@ -26,7 +27,7 @@ export default function CandidateProfile() {
   const fetchProfile = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`http://127.0.0.1:8000/candidates/${id}`)
+      const res = await fetch(`${API_BASE}/candidates/${id}`)
       if (!res.ok) throw new Error('Candidate profile not found.')
       const data = await res.json()
       setCandidate(data)
@@ -40,7 +41,7 @@ export default function CandidateProfile() {
   const runScreening = async (isBlind) => {
     try {
       setScreeningLoading(true)
-      const res = await fetch('http://127.0.0.1:8000/api/screen-candidate', {
+      const res = await fetch(`${API_BASE}/api/screen-candidate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 export default function WhatIfSimulator() {
@@ -17,7 +18,7 @@ export default function WhatIfSimulator() {
 
   const fetchSimulation = async (currentWeights) => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/what-if-simulate', {
+      const res = await fetch(`${API_BASE}/api/what-if-simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ weights: currentWeights })

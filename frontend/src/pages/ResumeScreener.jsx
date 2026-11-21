@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 export default function ResumeScreener() {
@@ -95,7 +96,7 @@ export default function ResumeScreener() {
     setIsAnalyzingJD(true)
     setError('')
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/extract-jd-requirements', {
+      const res = await fetch(`${API_BASE}/api/extract-jd-requirements`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ job_description: jobDescription })
@@ -141,7 +142,7 @@ export default function ResumeScreener() {
       setTimeout(() => setScreeningProgress('3. Computing experience relevance & missing gaps...'), 800)
       setTimeout(() => setScreeningProgress('4. Generating explainable AI recommendations...'), 1200)
 
-      const response = await fetch('http://127.0.0.1:8000/api/screen-resumes', {
+      const response = await fetch(`${API_BASE}/api/screen-resumes`, {
         method: 'POST',
         body: formData
       })
@@ -169,7 +170,7 @@ export default function ResumeScreener() {
     )
 
     try {
-      await fetch(`http://127.0.0.1:8000/api/candidates/${candidateId}/toggle-shortlist`, {
+      await fetch(`${API_BASE}/api/candidates/${candidateId}/toggle-shortlist`, {
         method: 'POST'
       })
     } catch (err) {

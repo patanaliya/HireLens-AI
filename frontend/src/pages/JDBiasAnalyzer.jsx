@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 const SAMPLE_BIASED_JD = `We are looking for a rockstar full-stack developer and coding ninja to join our young energetic team.
@@ -16,7 +17,7 @@ export default function JDBiasAnalyzer() {
     if (!jdText.trim()) return
     setLoading(true)
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/jobs/analyze-bias', {
+      const res = await fetch(`${API_BASE}/api/jobs/analyze-bias`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jd_text: jdText })

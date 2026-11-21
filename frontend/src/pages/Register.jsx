@@ -1,6 +1,7 @@
 
 import { useState } from 'react'
 import { useLocation, Link } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 function Register() {
@@ -85,7 +86,7 @@ function Register() {
     try {
       setIsSubmitting(true)
 
-      const response = await fetch('http://127.0.0.1:8000/register', {
+      const response = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

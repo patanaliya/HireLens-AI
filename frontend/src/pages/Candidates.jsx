@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 function Candidates() {
@@ -16,7 +17,7 @@ function Candidates() {
   useEffect(() => {
     async function fetchCandidates() {
       try {
-        const response = await fetch('http://127.0.0.1:8000/candidates')
+        const response = await fetch(`${API_BASE}/candidates`)
 
         if (!response.ok) {
           throw new Error('Unable to load candidate profiles.')

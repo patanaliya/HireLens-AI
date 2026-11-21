@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { API_BASE } from '../config'
 import '../App.css'
 
 function Login() {
@@ -39,7 +40,7 @@ function Login() {
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/login', {
+      const response = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
