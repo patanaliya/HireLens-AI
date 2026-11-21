@@ -3,22 +3,25 @@
 HireLens AI - Document Parser & PII Anonymizer
 
 Extracts clean text and structural sections from PDF, DOCX, and TXT resumes.
-Supports blind screening by masking personal information.
+Supports OCR for scanned PDFs and blind screening by masking personal information.
 """
 
 import re
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, List
-from io import BytesIO
 
 import fitz
 import pytesseract
 from PIL import Image
 from docx import Document
 
+
+# Tesseract OCR executable path on Windows
 pytesseract.pytesseract.tesseract_cmd = (
     r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 )
+
 
 class ResumeParser:
     """Extracts text, structural sections, and sentences from resumes."""
@@ -54,55 +57,109 @@ class ResumeParser:
         )
     }
 
-        @staticmethod
+    @staticmethod
+    def _extract_pdf_text(pdf_document) -> str:
+        """Extract text from PDF pages, using OCR when necessary."""
+
+        extracted_pages = []
+
+        for page in pdf_document:
+            page_text = page.get_text().strip()
+
+            # Use OCR when the page has no selectable text
+            if not page_text:
+                pix = page.get_pixmap(
+                    matrix=fitz.Matrix(2, 2),
+                    alpha=False
+                )
+
+                image = Image.open(
+                    BytesIO(pix.tobytes("png"))
+                )
+
+                page_text = pytesseract.image_to_string(
+                    image,
+                    lang="eng"
+                ).strip()
+
+            extracted_pages.append(page_text)
+
+        return "\n".join(extracted_pages).strip()
+
+    @staticmethod
     def extract_text(file_path: Path) -> str:
-        """Extract text from PDF, DOCX, or TXT files.
+        """
+        Extract text from a PDF, DOCX, or TXT file using its file path.
         Uses OCR for scanned PDF pages.
         """
 
+        file_path = Path(file_path)
         ext = file_path.suffix.lower()
 
         if ext == ".pdf":
-            extracted_pages = []
-
             with fitz.open(file_path) as pdf:
-                for page in pdf:
-                    page_text = page.get_text().strip()
-
-                    # OCR fallback for scanned PDF pages
-                    if not page_text:
-                        pix = page.get_pixmap(
-                            matrix=fitz.Matrix(2, 2),
-                            alpha=False
-                        )
-
-                        image = Image.open(
-                            BytesIO(pix.tobytes("png"))
-                        )
-
-                        page_text = pytesseract.image_to_string(
-                            image,
-                            lang="eng"
-                        ).strip()
-
-                    extracted_pages.append(page_text)
-
-            return "\n".join(extracted_pages).strip()
+                return ResumeParser._extract_pdf_text(pdf)
 
         elif ext == ".docx":
-            doc = Document(file_path)
+            document = Document(file_path)
+
             return "\n".join(
-                p.text for p in doc.paragraphs if p.text.strip()
+                paragraph.text
+                for paragraph in document.paragraphs
+                if paragraph.text.strip()
             )
 
         elif ext == ".txt":
             with open(
-                file_path, "r", encoding="utf-8", errors="ignore"
-            ) as f:
-                return f.read().strip()
+                file_path,
+                "r",
+                encoding="utf-8",
+                errors="ignore"
+            ) as file:
+                return file.read().strip()
 
         else:
-            raise ValueError(f"Unsupported file format: {ext}")
+            raise ValueError(
+                f"Unsupported file format: {ext}"
+            )
+
+    @staticmethod
+    def extract_text_from_bytes(content: bytes, filename: str) -> str:
+        """
+        Extract text directly from uploaded file bytes.
+        Supports PDF, DOCX, and TXT.
+        Uses OCR for scanned PDF pages.
+        """
+
+        ext = Path(filename).suffix.lower()
+
+        if ext == ".pdf":
+            with fitz.open(
+                stream=content,
+                filetype="pdf"
+            ) as pdf:
+                return ResumeParser._extract_pdf_text(pdf)
+
+        elif ext == ".docx":
+            document = Document(BytesIO(content))
+
+            return "\n".join(
+                paragraph.text
+                for paragraph in document.paragraphs
+                if paragraph.text.strip()
+            )
+
+        elif ext == ".txt":
+            return content.decode(
+                "utf-8",
+                errors="ignore"
+            ).strip()
+
+        else:
+            raise ValueError(
+                f"Unsupported file format: {ext}"
+            )
+
     @classmethod
     def segment_sections(cls, raw_text: str) -> Dict[str, str]:
         """Divide resume text into logical sections."""
@@ -126,7 +183,6 @@ class ResumeParser:
         current_section = "other"
 
         for line in lines:
-
             matched_section = None
 
             clean_line = re.sub(
@@ -135,7 +191,11 @@ class ResumeParser:
                 line
             ).strip()
 
-            clean_line = re.sub(r"[-]+$", "", clean_line).strip()
+            clean_line = re.sub(
+                r"-+$",
+                "",
+                clean_line
+            ).strip()
 
             if len(clean_line.split()) <= 5:
                 for sec_name, pattern in cls.SECTION_PATTERNS.items():
@@ -164,7 +224,11 @@ class ResumeParser:
             raw_text
         )
 
-        cleaned = re.sub(r"(?m)^\s*[-*]\s*", "", cleaned)
+        cleaned = re.sub(
+            r"(?m)^\s*[-*]\s*",
+            "",
+            cleaned
+        )
 
         sentences = re.split(
             r"(?<=[.!?])\s+|\n+",
