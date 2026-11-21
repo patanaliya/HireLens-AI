@@ -9,10 +9,16 @@ Supports blind screening by masking personal information.
 import re
 from pathlib import Path
 from typing import Dict, List
+from io import BytesIO
 
-import fitz  # PyMuPDF
+import fitz
+import pytesseract
+from PIL import Image
 from docx import Document
 
+pytesseract.pytesseract.tesseract_cmd = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+)
 
 class ResumeParser:
     """Extracts text, structural sections, and sentences from resumes."""
@@ -48,20 +54,40 @@ class ResumeParser:
         )
     }
 
-    @staticmethod
+        @staticmethod
     def extract_text(file_path: Path) -> str:
-        """Extract text from PDF, DOCX, or TXT files."""
+        """Extract text from PDF, DOCX, or TXT files.
+        Uses OCR for scanned PDF pages.
+        """
 
         ext = file_path.suffix.lower()
 
         if ext == ".pdf":
-            text = ""
+            extracted_pages = []
 
             with fitz.open(file_path) as pdf:
                 for page in pdf:
-                    text += page.get_text() + "\n"
+                    page_text = page.get_text().strip()
 
-            return text.strip()
+                    # OCR fallback for scanned PDF pages
+                    if not page_text:
+                        pix = page.get_pixmap(
+                            matrix=fitz.Matrix(2, 2),
+                            alpha=False
+                        )
+
+                        image = Image.open(
+                            BytesIO(pix.tobytes("png"))
+                        )
+
+                        page_text = pytesseract.image_to_string(
+                            image,
+                            lang="eng"
+                        ).strip()
+
+                    extracted_pages.append(page_text)
+
+            return "\n".join(extracted_pages).strip()
 
         elif ext == ".docx":
             doc = Document(file_path)
@@ -77,7 +103,6 @@ class ResumeParser:
 
         else:
             raise ValueError(f"Unsupported file format: {ext}")
-
     @classmethod
     def segment_sections(cls, raw_text: str) -> Dict[str, str]:
         """Divide resume text into logical sections."""
