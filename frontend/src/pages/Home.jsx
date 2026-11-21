@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom'
 import '../App.css'
 
@@ -115,8 +116,9 @@ function Home() {
         </div>
 
         <div className="feature-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
-          
-          <Link to="/candidates" style={{ textDecoration: 'none', color: 'inherit' }}>
+
+          {/* Explainable Match Scoring */}
+          <Link to="/screen" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="feature-card" style={{ background: '#ffffff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
               <div className="feature-icon" style={{ fontSize: '2rem', marginBottom: '12px' }}>🎯</div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px', color: '#0f172a' }}>Explainable Match Scoring</h3>
@@ -126,7 +128,8 @@ function Home() {
             </div>
           </Link>
 
-          <Link to="/candidates" style={{ textDecoration: 'none', color: 'inherit' }}>
+          {/* Blind Screening Mode */}
+          <Link to="/candidates?blind=true" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="feature-card" style={{ background: '#ffffff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
               <div className="feature-icon" style={{ fontSize: '2rem', marginBottom: '12px' }}>🛡️</div>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px', color: '#0f172a' }}>Blind Screening Mode</h3>
@@ -136,6 +139,7 @@ function Home() {
             </div>
           </Link>
 
+          {/* What-If Simulator */}
           <Link to="/what-if" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="feature-card" style={{ background: '#ffffff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
               <div className="feature-icon" style={{ fontSize: '2rem', marginBottom: '12px' }}>🎚️</div>
@@ -146,6 +150,7 @@ function Home() {
             </div>
           </Link>
 
+          {/* JD Bias Analyzer */}
           <Link to="/jd-bias" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className="feature-card" style={{ background: '#ffffff', padding: '28px', borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
               <div className="feature-icon" style={{ fontSize: '2rem', marginBottom: '12px' }}>⚖️</div>

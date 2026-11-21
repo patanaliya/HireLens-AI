@@ -1,4 +1,2 @@
 // HireLens AI API Base Configuration
-export const API_BASE =
-  import.meta.env.VITE_API_URL ||
-  'https://hirelens-backend-ea18.onrender.com'
+export const API_BASE = 'http://127.0.0.1:8000';
