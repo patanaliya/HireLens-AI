@@ -18,7 +18,6 @@ export default function ResumeScreener() {
     'We are seeking a Senior Full-Stack Engineer with 3+ years of experience to design and build high-throughput microservices using Python, FastAPI, React, Docker, and PostgreSQL. Experience with cloud deployments and REST APIs is highly valued.'
   )
   const [uploadedFiles, setUploadedFiles] = useState([])
-  const [includeBenchmarks, setIncludeBenchmarks] = useState(true)
 
   // Status & Results
   const [isAnalyzingJD, setIsAnalyzingJD] = useState(false)
@@ -122,6 +121,10 @@ export default function ResumeScreener() {
 
   // Run AI Resume Screening
   const handleRunScreening = async () => {
+    if (uploadedFiles.length === 0) {
+      setError('Please upload at least one candidate resume file (PDF, DOCX, or TXT) before running screening.')
+      return
+    }
     setIsScreening(true)
     setError('')
     setScreeningProgress('1. Parsing resume text (PDF / DOCX)...')
@@ -136,7 +139,7 @@ export default function ResumeScreener() {
       formData.append('required_skills', skillsList.join(', '))
       formData.append('min_experience', minExp.toString())
       formData.append('blind_mode', blindMode.toString())
-      formData.append('include_benchmarks', includeBenchmarks.toString())
+      formData.append('include_benchmarks', 'false')
 
       setTimeout(() => setScreeningProgress('2. Extracting technical skills & NLP graph mapping...'), 400)
       setTimeout(() => setScreeningProgress('3. Computing experience relevance & missing gaps...'), 800)
@@ -214,9 +217,11 @@ export default function ResumeScreener() {
     URL.revokeObjectURL(url)
   }
 
-  // Auto-run screening on initial load so page is never empty
+  // Only re-run if candidate resumes have already been screened when toggling blind mode
   useEffect(() => {
-    handleRunScreening()
+    if (hasScreened && uploadedFiles.length > 0) {
+      handleRunScreening()
+    }
   }, [blindMode])
 
   const shortlistedCount = rankedCandidates.filter(c => c.is_shortlisted).length
@@ -382,18 +387,9 @@ export default function ResumeScreener() {
               </div>
             )}
 
-            {/* Benchmark Candidates Toggle */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <strong style={{ fontSize: '0.85rem', color: '#1e293b' }}>Include 4 Benchmark Database Candidates</strong>
-                <p style={{ margin: '2px 0 0', fontSize: '0.78rem', color: '#64748b' }}>Priya (Full-Stack), Rohan (DevOps), Ananya (Frontend), Vikram (ML)</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={includeBenchmarks}
-                onChange={e => setIncludeBenchmarks(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
+            {/* Upload Guidance */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 14px', fontSize: '0.82rem', color: '#64748b' }}>
+              💡 <strong>Uploaded-Only Screening:</strong> Only resumes you attach above will be parsed, matched, and ranked in your results leaderboard below.
             </div>
           </div>
 
@@ -926,7 +922,19 @@ export default function ResumeScreener() {
               )
             })}
 
-            {filteredCandidates.length === 0 && (
+            {!hasScreened && rankedCandidates.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '14px' }}>📄</div>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px' }}>
+                  No Resumes Uploaded Yet
+                </h3>
+                <p style={{ maxWidth: '480px', margin: '0 auto 18px', fontSize: '0.92rem', lineHeight: 1.6 }}>
+                  Attach your candidate resumes (PDF, DOCX, or TXT) in <strong>Step 1</strong> above and click <strong>"Run AI Resume Screening & Candidate Ranking"</strong> to see only your candidates analyzed and ranked here.
+                </p>
+              </div>
+            )}
+
+            {hasScreened && filteredCandidates.length === 0 && (
               <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🔍</div>
                 <h3>No candidates found for this filter</h3>

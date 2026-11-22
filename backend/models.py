@@ -119,7 +119,9 @@ class Resume(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     candidate_id = Column(Integer, ForeignKey("candidate_profiles.id"), nullable=False)
-    file_path = Column(String(500), nullable=False)
+    file_path = Column(String(500), nullable=True)
+    file_name = Column(String(255), nullable=True)
+    file_data_base64 = Column(Text, nullable=True)  # Persistent storage in database for cloud hosting (Render/AWS)
     file_hash = Column(String(64), nullable=True)  # SHA256 for integrity and deduplication
     raw_text = Column(Text, nullable=False)
     anonymized_text = Column(Text, nullable=True)  # PII stripped text (names, emails, phones, colleges)

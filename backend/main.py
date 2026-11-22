@@ -4,6 +4,8 @@ import json
 import fitz
 import io
 import re
+import base64
+import os
 
 from pathlib import Path
 from docx import Document
@@ -56,6 +58,17 @@ from security import (
 # ==========================================
 
 Base.metadata.create_all(bind=engine)
+
+# Auto-seed benchmark data if new / empty database (Render PostgreSQL)
+try:
+    from seed_data import seed_demo_data
+    from database import SessionLocal
+    _init_db = SessionLocal()
+    if _init_db.query(User).count() == 0:
+        seed_demo_data()
+    _init_db.close()
+except Exception:
+    pass
 
 
 # ==========================================
@@ -123,9 +136,20 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 # CORS CONFIGURATION
 # ==========================================
 
+frontend_origins = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+custom_frontend = os.getenv("FRONTEND_URL")
+if custom_frontend:
+    frontend_origins.append(custom_frontend.rstrip("/"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=frontend_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|http://.*:5173",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -615,6 +639,26 @@ async def upload_resume(
             raise ValueError(
                 "No readable text found in the resume."
             )
+
+        # Store persistent resume record in database (guaranteed survival across Render restarts)
+        file_b64 = base64.b64encode(file_content).decode("utf-8")
+        resume_record = db.query(Resume).filter_by(candidate_id=candidate_id).first()
+        if not resume_record:
+            resume_record = Resume(
+                candidate_id=candidate_id,
+                file_path=str(file_path),
+                file_name=file.filename,
+                file_data_base64=file_b64,
+                raw_text=extracted_text,
+                anonymized_text=ResumeParser.anonymize_text(extracted_text)
+            )
+            db.add(resume_record)
+        else:
+            resume_record.file_path = str(file_path)
+            resume_record.file_name = file.filename
+            resume_record.file_data_base64 = file_b64
+            resume_record.raw_text = extracted_text
+            resume_record.anonymized_text = ResumeParser.anonymize_text(extracted_text)
 
         db.execute(
             text("""
@@ -1144,7 +1188,7 @@ async def screen_resumes(
     ),
     min_experience: float = Form(2.0),
     blind_mode: bool = Form(False),
-    include_benchmarks: bool = Form(True),
+    include_benchmarks: bool = Form(False),
     db: Session = Depends(get_db)
 ):
     """
@@ -1453,9 +1497,8 @@ async def screen_resumes(
                 "is_shortlisted": False
             })
 
-    # 3. Process benchmark candidates
-
-    if include_benchmarks or not ranked_results:
+    # 3. Process benchmark candidates (only if explicitly requested)
+    if include_benchmarks:
 
         db_candidates = db.query(
             CandidateProfile

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { API_BASE } from '../config'
 import '../App.css'
@@ -12,20 +12,32 @@ export default function JDBiasAnalyzer() {
   const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+  const resultsRef = useRef(null)
 
   const handleAnalyze = async () => {
     if (!jdText.trim()) return
     setLoading(true)
+    setError('')
     try {
       const res = await fetch(`${API_BASE}/api/jobs/analyze-bias`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jd_text: jdText })
       })
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}: ${res.statusText}`)
+      }
       const data = await res.json()
       setAnalysis(data)
+      setTimeout(() => {
+        if (resultsRef.current) {
+          resultsRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
+      }, 100)
     } catch (err) {
       console.error('Failed to analyze JD:', err)
+      setError(`Failed to connect to backend at ${API_BASE}. Make sure the backend server is running on port 8000. (${err.message})`)
     } finally {
       setLoading(false)
     }
@@ -45,8 +57,10 @@ export default function JDBiasAnalyzer() {
         <Link to="/" className="recruiter-brand" style={{ fontSize: '1.4rem', fontWeight: 800, textDecoration: 'none', color: '#1e293b' }}>
           HireLens <span style={{ color: '#2563eb' }}>AI</span>
         </Link>
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <Link to="/candidates" style={{ textDecoration: 'none', color: '#64748b', fontWeight: 600 }}>← Candidates</Link>
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+          <Link to="/" style={{ textDecoration: 'none', color: '#64748b', fontWeight: 600 }}>Home</Link>
+          <Link to="/screen" style={{ textDecoration: 'none', color: '#2563eb', fontWeight: 700 }}>AI Screener 🚀</Link>
+          <Link to="/candidates" style={{ textDecoration: 'none', color: '#64748b', fontWeight: 600 }}>Candidates</Link>
           <Link to="/what-if" style={{ textDecoration: 'none', color: '#64748b', fontWeight: 600 }}>What-If Simulator</Link>
         </div>
       </nav>
@@ -71,7 +85,10 @@ export default function JDBiasAnalyzer() {
             Job Description Text:
           </label>
           <button
-            onClick={() => setJdText(SAMPLE_BIASED_JD)}
+            onClick={() => {
+              setJdText(SAMPLE_BIASED_JD)
+              setError('')
+            }}
             style={{ background: 'transparent', border: 'none', color: '#2563eb', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
           >
             Load Sample Biased JD
@@ -96,7 +113,13 @@ export default function JDBiasAnalyzer() {
           }}
         />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.9rem' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <button
             onClick={handleAnalyze}
             disabled={loading || !jdText.trim()}
@@ -108,7 +131,11 @@ export default function JDBiasAnalyzer() {
               borderRadius: '10px',
               fontWeight: 700,
               fontSize: '0.95rem',
-              cursor: loading ? 'not-allowed' : 'pointer'
+              cursor: loading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
             }}
           >
             {loading ? 'Analyzing Language...' : 'Scan for Bias & Generate Rewrite ✨'}
@@ -118,17 +145,17 @@ export default function JDBiasAnalyzer() {
 
       {/* Results View */}
       {analysis && (
-        <div style={{ paddingBottom: '60px' }}>
+        <div ref={resultsRef} style={{ paddingBottom: '60px' }}>
           {/* Summary Score Bar */}
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '28px' }}>
-            <div style={{ background: '#ffffff', padding: '20px 28px', borderRadius: '14px', border: '1px solid #e2e8f0', flex: 1 }}>
+          <div style={{ display: 'flex', gap: '20px', marginBottom: '28px', flexWrap: 'wrap' }}>
+            <div style={{ background: '#ffffff', padding: '20px 28px', borderRadius: '14px', border: '1px solid #e2e8f0', flex: 1, minWidth: '240px' }}>
               <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Inclusivity Status</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: analysis.flagged_count > 0 ? '#b45309' : '#059669', marginTop: '4px' }}>
                 {analysis.inclusivity_rating}
               </div>
             </div>
 
-            <div style={{ background: '#ffffff', padding: '20px 28px', borderRadius: '14px', border: '1px solid #e2e8f0', flex: 1 }}>
+            <div style={{ background: '#ffffff', padding: '20px 28px', borderRadius: '14px', border: '1px solid #e2e8f0', flex: 1, minWidth: '240px' }}>
               <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Exclusionary Terms Flagged</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ef4444', marginTop: '4px' }}>
                 {analysis.flagged_count} phrases
@@ -146,7 +173,7 @@ export default function JDBiasAnalyzer() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
                 {analysis.flagged_terms.map((term, i) => (
                   <div key={i} style={{ background: '#fef2f2', border: '1px solid #fecaca', padding: '16px', borderRadius: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <span style={{ textDecoration: 'line-through', color: '#b91c1c', fontWeight: 700 }}>
                         "{term.original}"
                       </span>
@@ -165,7 +192,7 @@ export default function JDBiasAnalyzer() {
           )}
 
           {/* Side by Side Comparison */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '24px' }}>
             {/* Original */}
             <div style={{ background: '#ffffff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
               <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#64748b', marginBottom: '12px' }}>Original JD</h4>
