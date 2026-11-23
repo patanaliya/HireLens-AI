@@ -171,3 +171,77 @@ def cluster_candidate_cohorts(db: Session = Depends(get_db)):
         "total_candidates": len(candidates),
         "cohorts": cohort_list
     }
+
+
+class InterviewGenRequest(BaseModel):
+    role: str = "Full-Stack Engineer"
+    candidate_skills: List[str] = ["React", "JavaScript", "Python"]
+    required_skills: List[str] = ["React", "FastAPI", "Docker", "PostgreSQL"]
+    experience_years: float = 3.0
+    difficulty: str = "medium"  # junior, medium, senior
+
+
+@router.post("/generate-interview")
+def generate_interview_questions(req: InterviewGenRequest):
+    """
+    Phase 11: Adaptive AI Interview Generator.
+    Produces role-specific technical, architectural, and behavioral questions
+    tailored to the candidate's verified skills and detected skill gaps.
+    """
+    cand_set = {s.lower().strip() for s in req.candidate_skills}
+    missing = [s for s in req.required_skills if s.lower().strip() not in cand_set]
+    matched = [s for s in req.required_skills if s.lower().strip() in cand_set]
+
+    questions = []
+
+    # 1. Technical Gap Questions
+    for skill in missing[:2]:
+        questions.append({
+            "category": "Technical Skill Gap Assessment",
+            "targeted_skill": skill,
+            "difficulty": req.difficulty.capitalize(),
+            "question": f"Our architecture for '{req.role}' depends on {skill}. How have you handled analogous problems in other stacks, and how would you approach adopting {skill}?",
+            "ideal_answer_outline": f"Candidate explains foundational concepts related to {skill} and cites concrete learning strategies.",
+            "red_flags": [f"Unsubstantiated claims of mastery in {skill}", "Dismissal of architectural necessity"]
+        })
+
+    # 2. Deep Dive on Matched Skills
+    for skill in matched[:2]:
+        questions.append({
+            "category": "Deep Technical Competency Probe",
+            "targeted_skill": skill,
+            "difficulty": "Senior" if req.experience_years >= 4 else "Medium",
+            "question": f"In your experience with {skill}, what was the most challenging production bug, latency spike, or scalability ceiling you resolved?",
+            "ideal_answer_outline": f"Demonstrates rigorous debugging methodology, profiling tools, and structural mitigations in {skill}.",
+            "red_flags": ["Surface-level syntax answers without operational context", "Blaming upstream tools without root-cause analysis"]
+        })
+
+    # 3. System Architecture / Scale Question
+    questions.append({
+        "category": "System Architecture & Trade-Offs",
+        "targeted_skill": "Distributed Systems",
+        "difficulty": "Senior" if req.experience_years >= 4 else "Medium",
+        "question": f"For a system handling high-throughput traffic in {req.role}, how do you evaluate synchronous REST vs asynchronous message queues (e.g. Kafka/RabbitMQ)?",
+        "ideal_answer_outline": "Candidate articulates decoupling, failure isolation, backpressure handling, and eventual consistency trade-offs.",
+        "red_flags": ["Defaulting to synchronous REST for all workloads regardless of scale", "Ignoring idempotency and failure retries"]
+    })
+
+    # 4. Behavioral & Team Dynamics
+    questions.append({
+        "category": "Behavioral & Technical Disagreements",
+        "targeted_skill": "Collaboration",
+        "difficulty": "Medium",
+        "question": "Describe a scenario where you disagreed with a colleague on a major architectural choice. How did you test alternatives and reach alignment?",
+        "ideal_answer_outline": "Shows data-driven decision making (benchmarks, RFCs, proof-of-concepts) and constructive team alignment.",
+        "red_flags": ["Rigid adherence to personal preference", "Escalating conflict without empirical evidence"]
+    })
+
+    return {
+        "role": req.role,
+        "difficulty_tier": req.difficulty,
+        "matched_skills": matched,
+        "missing_skills_targeted": missing,
+        "total_questions": len(questions),
+        "questions": questions
+    }
+
