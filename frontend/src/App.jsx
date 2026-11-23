@@ -9,6 +9,9 @@ import CandidateProfile from './pages/CandidateProfile'
 import WhatIfSimulator from './pages/WhatIfSimulator'
 import JDBiasAnalyzer from './pages/JDBiasAnalyzer'
 import ResumeScreener from './pages/ResumeScreener'
+import CandidateDashboard from './pages/CandidateDashboard'
+import RecruiterDashboard from './pages/RecruiterDashboard'
+import ModelBenchmarks from './pages/ModelBenchmarks'
 
 function App() {
   return (
@@ -17,6 +20,10 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/screen" element={<ResumeScreener />} />
         <Route path="/screening" element={<ResumeScreener />} />
+        <Route path="/candidate-dashboard" element={<CandidateDashboard />} />
+        <Route path="/recruiter-dashboard" element={<RecruiterDashboard />} />
+        <Route path="/models" element={<ModelBenchmarks />} />
+        <Route path="/benchmarks" element={<ModelBenchmarks />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/account-type" element={<AccountType />} />

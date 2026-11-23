@@ -78,6 +78,11 @@ class Job(Base):
     job_skills = relationship("JobSkill", back_populates="job", cascade="all, delete-orphan")
     matches = relationship("Match", back_populates="job", cascade="all, delete-orphan")
     decisions = relationship("RecruiterDecision", back_populates="job", cascade="all, delete-orphan")
+    applications = relationship("Application", back_populates="job", cascade="all, delete-orphan")
+    company = relationship("Company", back_populates="jobs")
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=True)
+    required_skills = Column(JSON, default=list)
+    preferred_skills = Column(JSON, default=list)
 
 
 # ==========================================
@@ -108,6 +113,7 @@ class CandidateProfile(Base):
     candidate_skills = relationship("CandidateSkill", back_populates="candidate", cascade="all, delete-orphan")
     matches = relationship("Match", back_populates="candidate", cascade="all, delete-orphan")
     decisions = relationship("RecruiterDecision", back_populates="candidate", cascade="all, delete-orphan")
+    applications = relationship("Application", back_populates="candidate", cascade="all, delete-orphan")
 
 
 # ==========================================
@@ -347,3 +353,98 @@ class EmbeddingRecord(Base):
     entity_id = Column(Integer, nullable=False, index=True)
     vector_json = Column(JSON, nullable=False)        # 384-dimensional vector list
     created_at = Column(DateTime, server_default=func.now())
+
+
+# ==========================================
+# 13. COMPANIES & RECRUITER PROFILES
+# ==========================================
+class Company(Base):
+    """Employer and company profile managed by recruiters."""
+    __tablename__ = "companies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(150), unique=True, nullable=False, index=True)
+    industry = Column(String(100), nullable=True)
+    website = Column(String(200), nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    jobs = relationship("Job", back_populates="company")
+
+
+# ==========================================
+# 14. APPLICATIONS & LIFECYCLE
+# ==========================================
+class Application(Base):
+    """Candidate job applications tracking lifecycle stages."""
+    __tablename__ = "applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey("candidate_profiles.id"), nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.id"), nullable=False)
+    status = Column(String(30), default="applied")  # 'applied', 'screened', 'shortlisted', 'interview', 'rejected', 'offer'
+    applied_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    notes = Column(Text, nullable=True)
+
+    candidate = relationship("CandidateProfile", back_populates="applications")
+    job = relationship("Job", back_populates="applications")
+
+
+# ==========================================
+# 15. MODEL VERSIONS & REGISTRY
+# ==========================================
+class ModelVersion(Base):
+    """Registry of Applied ML and Deep Learning model versions."""
+    __tablename__ = "model_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_name = Column(String(100), nullable=False)  # 'TF-IDF+LogisticRegression', 'RandomForestRelevance', 'SentenceBERT-MiniLM', 'NeuralRanker'
+    model_type = Column(String(50), nullable=False)   # 'Applied ML', 'Deep Learning', 'Hybrid'
+    version = Column(String(30), nullable=False, unique=True)  # 'v1.0.0'
+    hyperparameters = Column(JSON, default=dict)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    evaluations = relationship("ModelEvaluation", back_populates="model_version", cascade="all, delete-orphan")
+
+
+# ==========================================
+# 16. MODEL EVALUATIONS & BENCHMARK METRICS
+# ==========================================
+class ModelEvaluation(Base):
+    """Benchmark performance evaluation metrics for ML/DL models."""
+    __tablename__ = "model_evaluations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    model_version_id = Column(Integer, ForeignKey("model_versions.id"), nullable=False)
+    dataset_name = Column(String(100), default="HireLens-Benchmark-v1")
+    accuracy = Column(Float, nullable=True)
+    precision = Column(Float, nullable=True)
+    recall = Column(Float, nullable=True)
+    f1_score = Column(Float, nullable=True)
+    ndcg_at_k = Column(Float, nullable=True)
+    precision_at_k = Column(Float, nullable=True)
+    recall_at_k = Column(Float, nullable=True)
+    confusion_matrix_json = Column(JSON, default=dict)
+    evaluated_at = Column(DateTime, server_default=func.now())
+
+    model_version = relationship("ModelVersion", back_populates="evaluations")
+
+
+# ==========================================
+# 17. RESPONSIBLE AI & FAIRNESS AUDITS
+# ==========================================
+class FairnessAudit(Base):
+    """Responsible AI audit reports tracking parity and demographic selection rates."""
+    __tablename__ = "fairness_audits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    audit_name = Column(String(150), nullable=False)
+    model_version = Column(String(50), default="hirelens-v1.0")
+    disparity_ratio = Column(Float, default=1.0)  # 0.8 to 1.25 is standard 80% rule compliance
+    metrics_breakdown = Column(JSON, default=dict)
+    recommendations = Column(JSON, default=list)
+    limitations_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+

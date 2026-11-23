@@ -49,8 +49,17 @@ from parser import ResumeParser
 from security import (
     hash_password,
     verify_password,
-    create_access_token
+    create_access_token,
+    decode_access_token
 )
+
+from routers.auth import get_current_user
+from routers.jobs import router as jobs_router
+from routers.applications import router as applications_router
+from routers.models_ml_dl import router as models_router
+from routers.fairness import router as fairness_router
+from routers.admin import router as admin_router
+
 
 
 # ==========================================
@@ -154,6 +163,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Modular Routers
+app.include_router(jobs_router)
+app.include_router(applications_router)
+app.include_router(models_router)
+app.include_router(fairness_router)
+app.include_router(admin_router)
+
 
 
 # ==========================================
@@ -296,6 +313,36 @@ def health_check():
         "status": "healthy",
         "project": "HireLens AI"
     }
+
+
+@app.get("/me")
+def get_current_user_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Validates session token and returns active user and candidate profile."""
+    profile_data = None
+    if user.role == "candidate":
+        cand = db.query(CandidateProfile).filter(CandidateProfile.user_id == user.id).first()
+        if cand:
+            profile_data = {
+                "candidate_id": cand.id,
+                "headline": cand.headline,
+                "location": cand.location,
+                "experience_years": cand.experience_years,
+                "education": cand.education,
+                "skills": cand.skills or [],
+                "blind_id": cand.blind_id
+            }
+
+    return {
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+            "company_name": user.company_name
+        },
+        "profile": profile_data
+    }
+
 
 
 # ==========================================

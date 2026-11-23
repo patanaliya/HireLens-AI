@@ -12,12 +12,14 @@ function Home() {
           HireLens <span>AI</span>
         </Link>
 
-        <div className="nav-links" style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+        <div className="nav-links" style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
           <Link to="/" style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'none' }}>Home</Link>
-          <Link to="/screen" style={{ fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>AI Screener & Ranker ✨</Link>
-          <Link to="/candidates" style={{ fontWeight: 600, color: '#475569', textDecoration: 'none' }}>Candidates</Link>
-          <Link to="/what-if" style={{ fontWeight: 600, color: '#475569', textDecoration: 'none' }}>What-If Simulator</Link>
-          <Link to="/jd-bias" style={{ fontWeight: 600, color: '#7c3aed', textDecoration: 'none' }}>JD Bias Analyzer</Link>
+          <Link to="/screen" style={{ fontWeight: 700, color: '#2563eb', textDecoration: 'none' }}>AI Screener 🚀</Link>
+          <Link to="/recruiter-dashboard" style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'none' }}>Recruiter Studio</Link>
+          <Link to="/candidate-dashboard" style={{ fontWeight: 600, color: '#1e293b', textDecoration: 'none' }}>Candidate Portal</Link>
+          <Link to="/models" style={{ fontWeight: 700, color: '#7c3aed', textDecoration: 'none' }}>ML & DL Lab 🔬</Link>
+          <Link to="/what-if" style={{ fontWeight: 600, color: '#475569', textDecoration: 'none' }}>What-If</Link>
+          <Link to="/jd-bias" style={{ fontWeight: 600, color: '#475569', textDecoration: 'none' }}>JD Bias</Link>
         </div>
 
         <div className="nav-buttons" style={{ display: 'flex', gap: '12px' }}>
@@ -55,14 +57,19 @@ function Home() {
                 🚀 Upload & Screen Resumes
               </button>
             </Link>
-            <Link to="/candidates">
-              <button className="secondary-btn" style={{ background: '#f1f5f9', color: '#1e293b' }}>
-                Explore Candidates →
+            <Link to="/recruiter-dashboard">
+              <button className="secondary-btn" style={{ background: '#f1f5f9', color: '#1e293b', fontWeight: 700 }}>
+                Recruiter Studio →
               </button>
             </Link>
-            <Link to="/what-if">
-              <button className="secondary-btn" style={{ background: '#f1f5f9', color: '#1e293b' }}>
-                Try What-If Simulator 🎚️
+            <Link to="/candidate-dashboard">
+              <button className="secondary-btn" style={{ background: '#f1f5f9', color: '#1e293b', fontWeight: 700 }}>
+                Candidate Portal 💼
+              </button>
+            </Link>
+            <Link to="/models">
+              <button className="secondary-btn" style={{ background: '#f3e8ff', color: '#6b21a8', border: '1px solid #d8b4fe', fontWeight: 700 }}>
+                ML & DL Lab 🔬
               </button>
             </Link>
           </div>
@@ -157,6 +164,17 @@ function Home() {
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px', color: '#0f172a' }}>JD Bias & Inclusivity Analyzer</h3>
               <p style={{ color: '#64748b', fontSize: '0.92rem' }}>
                 Flags aggressive or exclusionary wording and automatically provides side-by-side inclusive rewrites.
+              </p>
+            </div>
+          </Link>
+
+          {/* Applied ML & Deep Learning Benchmark Lab */}
+          <Link to="/models" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="feature-card" style={{ background: '#fdf4ff', padding: '28px', borderRadius: '16px', border: '1px solid #f0abfc', height: '100%' }}>
+              <div className="feature-icon" style={{ fontSize: '2rem', marginBottom: '12px' }}>🔬</div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '8px', color: '#701a75' }}>Applied ML & Deep Learning Lab</h3>
+              <p style={{ color: '#86198f', fontSize: '0.92rem' }}>
+                Comparative benchmarks (TF-IDF vs Random Forest vs Sentence-BERT), NDCG@3 metrics, and Four-Fifths fairness audits.
               </p>
             </div>
           </Link>
